@@ -1,0 +1,16 @@
+div.tooltip {
+    position: absolute;
+    text-align: center;
+    width: 250px;
+    height: 30px;
+    padding: 2px;
+    padding-top: 10px;
+    font: 12px sans-serif;
+    background: grey;
+    color: white;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+text {font-family: 'Roboto', sans-serif;}
