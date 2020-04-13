@@ -246,7 +246,8 @@
 
 
                     svg.selectAll(".countryname")
-
+                        .transition()
+                        .duration(3000)
                         .style("opacity", function (d) {
                             var name = d.properties.NAME_ENGL;
                             let retname = values[2].find(d => d.country === name);
@@ -742,11 +743,11 @@
                     .enter().append("g")
                     .attr("class", "legend")
                     .attr("transform", function(d, i) { return "translate(0," + (i+1) * 20 + ")"; });
-                
+
 
                 // draw legend colored rectangles
                 legend.append("rect")
-                    .attr("x", w - 18)
+                    .attr("x", w - 22)
                     .attr("width", 18)
                     .attr("height", 18)
                     .style("fill", (d,i)=> d.color)
@@ -866,7 +867,7 @@
                     .text("Happiness")
                     .append('svg:tspan')
                     .attr('x', xpos-20)
-                    .attr('dy', ypos-5)
+                    .attr('dy', ypos-2)
                     .text("Index");
 
 //Set scale for x-axis
