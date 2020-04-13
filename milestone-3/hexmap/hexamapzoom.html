@@ -27,15 +27,20 @@
         //https://observablehq.com/@karimdouieb/world-tile-grid-map
 
 
-        const zoom = d3.zoom()
-            .scaleExtent([1, 8])
-            .on("zoom", zoomed);
+
 
         var block = false;
         var w = 1800;
         var h = 800;
         var margintop = 60;
         var marginside = 500;
+
+        const zoom = d3.zoom()
+            .extent([[-100, -100], [w+100, h+100]])
+            .scaleExtent([1, 8])
+            .translateExtent([[-100, -100], [w+100, h+100]])
+            .on("zoom", zoomed);
+
         var viewbox = d3.select("#mapcontainer")
             .append("svg")
             .attr("preserveAspectRatio", "xMinYMin meet")
@@ -195,6 +200,8 @@
 
 
 
+
+
         //This code for building tooltips as well some other related code later on is adapted from:
         //https://www.d3-graph-gallery.com/graph/interactivity_tooltip.html
         var tooltip = d3.select("#mapcontainer")
@@ -219,6 +226,61 @@
             .attr("height", h*6)
             .style("fill", "#c9e8fd");
 
+        function drawhexbg(){
+            for(let x = -20; x<50; x++){
+                for(let y = -10; y<50; y++){
+                    let j1;
+                    if(Math.abs(y) % 2 == 1){
+                        j1 = x*2+1;
+                    }
+                    else{
+                        j1 = x*2;
+                    }
+                    let mid = [j1*spacing/2 +marginside, y*spacing +margintop];
+                    let top = {
+                        "x": mid[0],
+                        "y": mid[1]-size
+                    }
+                    let topleft = {
+                        "x": mid[0] + adj,
+                        "y": mid[1] - opp
+                    }
+                    let bottomleft = {
+                        "x": mid[0] + adj,
+                        "y": mid[1] + opp
+                    }
+                    let bottom = {
+                        "x": mid[0],
+                        "y": mid[1] + size
+                    }
+                    let bottomright = {
+                        "x": mid[0] - adj,
+                        "y": mid[1] + opp
+                    }
+                    let topright = {
+                        "x": mid[0] - adj,
+                        "y": mid[1] - opp
+                    }
+                    hex = d3.path();
+                    hex.moveTo(top.x, top.y);
+                    hex.lineTo(topleft.x, topleft.y);
+                    hex.lineTo(bottomleft.x, bottomleft.y);
+                    hex.lineTo(bottom.x, bottom.y);
+                    hex.lineTo(bottomright.x, bottomright.y);
+                    hex.lineTo(topright.x, topleft.y);
+                    hex.closePath();
+                    svg.append("path")
+                        .attr("d", hex)
+                        .style("fill", "white")
+                        .attr("class", "hexbg")
+                        .style("opacity", 0.12)
+                        .style("pointer-events", "none");
+                }
+            }
+
+        }
+
+        drawhexbg();
 
 
             Promise.all([worldmap, grid, data, regions]).then(function (values) {
@@ -264,7 +326,7 @@
                             }
                         })
 
-                    svg.selectAll("path")
+                    svg.selectAll(".countrysvg")
                         .transition()
                         .duration(3000)
                         .style('stroke-width', function (d) {
@@ -443,7 +505,7 @@
 
                         });
 
-                    d3.selectAll("path")
+                    d3.selectAll(".countrysvg")
                         .classed("Active", false);
 
                 }
@@ -502,6 +564,7 @@
 
 
                 plot.append("path")
+                    .attr("class", "countrysvg")
                     .attr("d", path)
                     .attr("fill",  function (d) {
                         let name = d.properties.NAME_ENGL;
@@ -771,7 +834,7 @@
 
                             });
 
-                        svg.selectAll("path")
+                        svg.selectAll(".countrysvg")
                             .each(function (d){
                                 let country = d.properties.ISO3_CODE;
                                 var name = d.properties.NAME_ENGL;
