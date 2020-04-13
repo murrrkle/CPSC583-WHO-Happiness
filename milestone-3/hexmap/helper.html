@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+<body>
+<script>
+
+    //everything in grid.json is in mycountries.json
+    var dats;
+    dats =  d3.json("datafixed.json");
+    var data = d3.csv('data.csv', function(d) {
+        return {
+            country: d.Country,
+            happiness_score: +d["Happiness score"],
+            values: [+d["Dystopia (1.88) + residual"], +d["Explained by: GDP per capita"], +d["Explained by: Social support"],
+                +d["Explained by: Healthy life expectancy"], +d["Explained by: Freedom to make life choices"], +d["Explained by: Generosity"],
+                +d["Explained by: Perceptions of corruption"]]
+        };
+    });
+
+    Promise.all([dats, data]).then(function (values) {
+
+        var arr = [];
+        for(var item in values[1]){
+
+            let country = values[1][item].country;
+            let found = values[0].find(d => d.Country === country);
+            if(found == null){
+                arr.push([item, country])
+            }
+        }
+
+        console.log(arr)
+
+
+    })
+</script>
+</body>
+</html>
