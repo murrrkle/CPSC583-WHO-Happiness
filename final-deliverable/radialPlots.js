@@ -22,14 +22,6 @@ function arcOutTransition(d, i) {
     return t => arc(interpolate(t), i);
 }
 
-function showFlagToolTip(vals) {
-    tooltip.style('left', (d3.event.pageX + 10) + 'px')
-        .style('top', (d3.event.pageY - 25) + 'px')
-        .style('display', 'inline-block')
-        .html( "Total Happiness Score: " + vals.happiness_score + "<br\>Dystopia score: " + vals.dystopia_score)
-        .style("opacity", 1);
-}
-
 function showRadialToolTip(d, i) {
     tooltip.style('display', 'inline-block')
         .html(columns[i] + ": " + d)
@@ -120,8 +112,18 @@ function generateRadial(object, values) {
                 .append("use")
                 .attr("xlink:href", "#path-" + t.properties.ISO3_CODE);
 
+        // Hacky way of doing this so I don't have to figure out variable passing within event tags
+        let flagToolTip = function() {
+            let vals = values[2].find(d => d.country === t.properties.NAME_ENGL);
+            tooltip.style('left', (d3.event.pageX + 10) + 'px')
+                .style('top', (d3.event.pageY - 25) + 'px')
+                .style('display', 'inline-block')
+                .html( t.properties.NAME_ENGL + "<br\>Happiness Score: " + vals.happiness_score + "<br\>Dystopia score: " + vals.dystopia_score)
+                .style("opacity", 1);
+        }
+
         d3.select(object).append('image')
-            .on('mousemove', showFlagToolTip(values[2].find(d => (d.country === t.properties.NAME_ENGL))))
+            .on('mousemove', flagToolTip)
             .on('mouseout', hideTooltip)
             .attr('href', d => flags[t.properties.NAME_ENGL])
             .attr('width', arcMinRadius * imageScaleFactor)
