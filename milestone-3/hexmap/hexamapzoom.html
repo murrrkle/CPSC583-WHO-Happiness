@@ -27,7 +27,13 @@
         //https://observablehq.com/@karimdouieb/world-tile-grid-map
 
 
-
+        const barWindowWidth = 300, barWindowHeight = 200;
+        const barWindowMargins = {
+            top: 10,
+            bottom: 20,
+            left: 20,
+            right: 0
+        };
 
         var block = false;
         var w = 1800;
@@ -114,7 +120,14 @@
                 happiness_score: +d["Happiness score"],
                 values: [+d["Dystopia (1.88) + residual"], +d["Explained by: GDP per capita"], +d["Explained by: Social support"],
                     +d["Explained by: Healthy life expectancy"], +d["Explained by: Freedom to make life choices"], +d["Explained by: Generosity"],
-                    +d["Explained by: Perceptions of corruption"]]
+                    +d["Explained by: Perceptions of corruption"]],
+                dystopia :              +d["Dystopia (1.88) + residual"],
+                gdp :                   +d["Explained by: GDP per capita"],
+                socialSupport :         +d["Explained by: Social support"],
+                lifeExpectancy :        +d["Explained by: Healthy life expectancy"],
+                choiceFreedom :         +d["Explained by: Freedom to make life choices"],
+                generosity :            +d["Explained by: Generosity"],
+                corruptionPerception :  +d["Explained by: Perceptions of corruption"]
             };
         });
 
@@ -133,6 +146,16 @@
         var colorscale = d3.scaleSequential([0,8], d3.interpolateViridis)
             .nice();
 
+        let classes = ["Dystopia (1.88) + Residual",
+            "Explained by: GDP per capita",
+            "Explained by: Social support",
+            "Explained by: Healthy life expectancy",
+            "Explained by: Freedom to make life choices",
+            "Explained by: Generosity",
+            "Explained by: Perceptions of corruption"];
+
+        let barColours = d3.scaleOrdinal().domain(classes)
+            .range(d3.schemePastel2);
 
         var buttonpath = d3.path();
         let btnmid = [size*2 + 15, size*2 + 15];
@@ -226,6 +249,37 @@
             .attr("height", h*6)
             .style("fill", "#c9e8fd");
 
+        // setting up dimensions and scale for barWindow
+        let barWindow = d3.select("svg").append("g")
+            .attr("class", "barWindow")
+            .attr("x", w-barWindowWidth);
+
+        barWindow.append("rect")
+            .attr("class", "background")
+            .attr("x", w-barWindowWidth)
+            .attr("width", barWindowWidth)
+            .attr("height", barWindowHeight)
+            .style("fill", "grey")
+            .on("mouseover", function(d) {
+                d3.select(this).transition()
+                    .style("opacity", 0.6);
+            })
+            .on("mouseout", function(d) {
+                d3.select(this).transition()
+                    .style("opacity", 1);
+            });
+
+        barWindow.append("g")
+            .attr("class", "y-axis")
+            .attr("transform", translate(w-barWindowWidth, 0)).transition()
+            .call(d3.axisLeft(d3.scaleLinear([], [barWindowHeight, 0])));
+
+        barWindow.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", translate(w-barWindowWidth, barWindowHeight)).transition()
+            .call(d3.axisBottom(d3.scaleBand([], [0, barWindowWidth])));
+
+
         function drawhexbg(){
             for(let x = -20; x<50; x++){
                 for(let y = -10; y<50; y++){
@@ -284,7 +338,74 @@
 
 
             Promise.all([worldmap, grid, data, regions]).then(function (values) {
+                function updateBars() {
 
+                    let theSelected = d3.selectAll(".Active");
+                    // console.log(theSelected);
+                    let keys = ["dystopia",
+                        "gdp",
+                        "socialSupport",
+                        "lifeExpectancy",
+                        "choiceFreedom",
+                        "generosity",
+                        "corruptionPerception"];
+                    let stack = d3.stack()
+                        .keys(keys);
+
+                    // extract just the names/codes of the selected countries
+                    let theCountries = Array.from(theSelected._groups[0]).map(s => s.__data__.properties.NAME_ENGL);
+                    let theCountryCodes = Array.from(theSelected._groups[0]).map(s => s.__data__.properties.ISO3_CODE);
+
+                    // look up their actual data from the data csv using their name and make an array of these.
+                    let theData = theCountries.map(n => values[2].find(d => d.country === n));
+                    let series = stack(theData); // this will be the data used to generate the stacked bars
+
+                    // BarWindow xScale (dependent on selections)
+                    let barWindowXdomain = theCountryCodes;
+                    let barWindowXScale = d3.scaleBand(barWindowXdomain, [0, barWindowWidth])
+                        .padding(0.5);
+
+                    //console.log(theSelected, theData);
+                    let maxScore =  Math.max.apply(Math, theData.map(d => d.happiness_score));
+
+                    // BarWindow yScale.
+                    let barWindowYScale = d3.scaleLinear([0, maxScore + 0.5], [barWindowHeight, 0])
+                        .nice();
+
+
+                    d3.select(".y-axis").transition()
+                        .call(d3.axisLeft(barWindowYScale).ticks(5));
+
+                    d3.select(".x-axis").transition()
+                        .call(d3.axisBottom(barWindowXScale));
+
+                    // Data Join with the selected data
+                    let explainers = barWindow.selectAll(".explainer")
+                        .data(series);
+
+                    // Nested Join for making bars for each explainer
+                    let explainerBars = explainers.enter().append("g")
+                        .attr("class", "explainer")
+                        .attr("id", (d, i) => (classes[i]))
+                        //.attr("transform", translate(barWindowMargins.left, barWindowMargins.bottom))
+                        .attr("fill", (d, i) => barColours(i))
+                    .merge(explainers)
+                        .selectAll(".bar").data(d => (d));
+
+                    // draw the bars
+                    explainerBars.enter().append("rect")
+                        //.attr("class", (d, i) => { index += 1; return ("bar " + d.data.country.replace(/ /g,'') + ' ' + keys[Math.floor(index / 156)]);})
+                        .attr("class", "bar")
+                    .merge(explainerBars)
+                        .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
+                        .attr("y", (d, i) => (barWindowYScale(d[1]))) // latitude
+                        .attr("width", barWindowXScale.bandwidth())
+                        .attr("height", d => (barWindowYScale(d[0]) - barWindowYScale(d[1])));
+
+                    explainerBars.exit().remove();
+
+                    //console.log(theCountries, series, explainerBars);
+                }
 
                 function switchmode(option) {
                     viewbox.selectAll("#button")
@@ -640,6 +761,7 @@
                             }
                         }
 
+                        updateBars();
 
                     })
                     .style("stroke", function(d){
@@ -959,7 +1081,11 @@
 
         });
 
-
+        function translate(x, y) {
+            return `translate (${x}, ${y})`;
+        }
     </script>
 </body>
+<link rel="stylesheet" type="text/css" href="custom.css">
+<link href="https://fonts.googleapis.com/css?family=Karla&display=swap" rel="stylesheet">
 </html>
