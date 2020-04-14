@@ -651,15 +651,16 @@
                 .append("g");
 
             plot.on('click', function (d) {
-                    // Toggle active tag
-                    d3.select(this)
-                        .classed("Active", !d3.select(this).classed("Active"));
-
                     // Generate detail plots if already in block
                     // Have to check boolean block is flipped, but after path changed
                     let flag = false;
-                    if (block)
+                    if (block) {
+                        // Toggle active tag
+                        d3.select(this)
+                            .classed("Active", !d3.select(this).classed("Active"));
                         flag = true;
+                    }
+
 
                     // Transition and move plot
                     let name = d.properties.NAME_ENGL;
