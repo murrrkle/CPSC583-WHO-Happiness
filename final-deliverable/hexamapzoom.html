@@ -282,14 +282,13 @@
 
         // setting up dimensions and scale for barWindow
         let barWindow = d3.select("svg").append("g")
-            .attr("class", "barWindow")
-            .attr("x", w-barWindowWidth);
+            .attr("class", "barWindow");
 
         barWindow.append("rect")
             .attr("class", "background")
-            .attr("x", w-barWindowWidth)
-            .attr("width", barWindowWidth)
-            .attr("height", barWindowHeight)
+            .attr("x", w-barWindowWidth-20)
+            .attr("width", barWindowWidth+20)
+            .attr("height", barWindowHeight+26)
             .style("fill", "#EEEEEE")
             .on("mouseover", function(d) {
                 d3.select(this).transition()
@@ -302,12 +301,12 @@
 
         barWindow.append("g")
             .attr("class", "y-axis")
-            .attr("transform", translate(w-barWindowWidth, 0)).transition()
+            .attr("transform", translate(w-barWindowWidth, 6)).transition()
             .call(d3.axisLeft(d3.scaleLinear([], [barWindowHeight, 0])));
 
         barWindow.append("g")
             .attr("class", "x-axis")
-            .attr("transform", translate(w-barWindowWidth, barWindowHeight)).transition()
+            .attr("transform", translate(w-barWindowWidth, barWindowHeight+6)).transition()
             .call(d3.axisBottom(d3.scaleBand([], [0, barWindowWidth])));
 
 
@@ -372,7 +371,7 @@
                     .attr("class", "bar")
                     .merge(explainerBars)
                     .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
-                    .attr("y", (d, i) => (barWindowYScale(d[1]))) // latitude
+                    .attr("y", (d, i) => (6+barWindowYScale(d[1]))) // latitude
                     .attr("width", barWindowXScale.bandwidth())
                     .attr("height", d => (barWindowYScale(d[0]) - barWindowYScale(d[1])));
 
