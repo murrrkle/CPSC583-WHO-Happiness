@@ -427,7 +427,7 @@
                 .merge(explainerBars)
                 .attr("class", (d, i) => {
                     index += 1;
-                    console.log(explainerBars);
+                    //console.log(explainerBars);
                     return (`bar ${d.data.country} ${keys[index % 7]}`);
                 })
                 .attr("x", (d, i) => (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
@@ -513,7 +513,7 @@
 
             happinessText.exit()
                 .attr("class", d => d.country)
-                .attr("x", (d, i) => (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2)) // longitude
+                .attr("x", (d, i) => (isNaN(w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2) ? 0 : (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2))) // longitude
                 .attr("y", (d, i) => {
                     return d3.select("rect.corruptionPerception." + d.country.replace(/ /g, '.')).attr("y")
                 })
