@@ -102,7 +102,6 @@
         );
     }
 
-
     var projection = d3.geoMercator()
         .translate([w / 2, h / 2])
         .scale(175)
@@ -303,7 +302,17 @@
 
     // setting up dimensions and scale for barWindow
     let barWindow = d3.select("svg").append("g")
-        .attr("class", "barWindow");
+        .attr("class", "barWindow")
+        .on("mouseover", function (d) {
+            barWindowBackground.transition().style("opacity", 1)
+            barLegend.transition().style("opacity", 1);
+            barBackground.transition().style("opacity", 1);
+        })
+        .on("mouseout", function (d) {
+            barWindowBackground.transition().style("opacity", 0.6)
+            barLegend.transition().style("opacity", 0)
+            //barBackground.transition().style("opacity", 0.6);
+        });;
 
     let barLegend = barWindow.append('g')
         .attr("class", "barWindowLegend")
@@ -315,7 +324,8 @@
         .attr("y", barWindowHeight + 26)
         .attr("width", barWindowWidth + 20)
         .attr("height", 140)
-        .style("fill", "#EEEEEE");
+        .style("fill", "#EEEEEE")
+        .style("opacity", 0);
 
     barLegendLines = barLegend.selectAll("g").data(keys);
     barLegendLines.enter()
@@ -336,24 +346,13 @@
         .attr("font-size", "1em")
         .attr("fill", d3.color("grey").darker());
 
-    barWindow.append("rect")
+    let barWindowBackground = barWindow.append("rect")
         .attr("class", "barBackground")
         .attr("x", w - barWindowWidth - 20)
         .attr("width", barWindowWidth + 20)
         .attr("height", barWindowHeight + 26)
-        .style("fill", "#EEEEEE")
-        .on("mouseover", function (d) {
-            d3.select(this).transition()
-                .style("opacity", 0.6);
-            barLegend.transition().style("opacity", 1);
-            barBackground.transition().style("opacity", 0.6);
-        })
-        .on("mouseout", function (d) {
-            d3.select(this).transition()
-                .style("opacity", 1);
-            barLegend.transition().style("opacity", 0)
-            barBackground.transition().style("opacity", 0);
-        });
+        .style("opacity", 0.6)
+        .style("fill", "#EEEEEE");
 
     barWindow.append("g")
         .attr("class", "y-axis")
@@ -490,14 +489,7 @@
                     // tooltip.style("opacity", 0);
                 });
 
-            index = -1;
-            explainerBars.exit()
-                .remove()
-                .merge(explainerBars)
-                .attr("class", (d, i) => {
-                    index += 1;
-                    return (`bar ${d.data.country} ${keys[index % 7]}`)
-                });
+
 
             let happinessText = d3.selectAll(".explainer#corruptionPerception")
                 .selectAll("text").data(theData);
@@ -526,6 +518,15 @@
                     return d3.select("rect.corruptionPerception." + d.country.replace(/ /g, '.')).attr("y")
                 })
                 .remove();
+
+            index = -1;
+            explainerBars.exit()
+                .remove()
+                .merge(explainerBars)
+                .attr("class", (d, i) => {
+                    index += 1;
+                    return (`bar ${d.data.country} ${keys[index % 7]}`)
+                });
             /*
                 .append("text")
                 .text(d => Math.round(d.data.happiness*100)/100)
