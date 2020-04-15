@@ -129,6 +129,14 @@
             };
         })
 
+        const classes = ["Dystopia (1.88) + Residual",
+            "Explained by: GDP per capita",
+            "Explained by: Social support",
+            "Explained by: Healthy life expectancy",
+            "Explained by: Freedom to make life choices",
+            "Explained by: Generosity",
+            "Explained by: Perceptions of corruption"];
+
         var grid = d3.json("mygrid6.json");
 
         var regions = d3.json("all.json");
@@ -359,25 +367,123 @@
                 // Nested Join for making bars for each explainer
                 let explainerBars = explainers.enter().append("g")
                     .attr("class", "explainer")
-                    .attr("id", (d, i) => (columns[i]))
+                    .attr("id", (d, i) => {return (keys[i])})
                     //.attr("transform", translate(barWindowMargins.left, barWindowMargins.bottom))
                     .attr("fill", (d, i) => barColor(i))
-                    .merge(explainers)
+                .merge(explainers)
                     .selectAll(".bar").data(d => (d));
-
+/*
+                explainerBars = explainerBars
+                    .append("g")
+                    .attr("class", (d, i) => {index += 1; return ( "barGroup " + d.data.country.replace(/ /g,'') + ' ' + keys[Math.floor(index / (theData.length > 0 ? theData.length : 1))]);})
+                index = -1;
+*/
+                let index = -1;
                 // draw the bars
                 explainerBars.enter().append("rect")
-                    //.attr("class", (d, i) => { index += 1; return ("bar " + d.data.country.replace(/ /g,'') + ' ' + keys[Math.floor(index / 156)]);})
-                    .attr("class", "bar")
-                    .merge(explainerBars)
+                .merge(explainerBars)
+                    .attr("class", (d, i) => {
+                        index += 1;
+                        console.log(explainerBars);
+                        return (`bar ${d.data.country} ${keys[index % 7]}`);})
                     .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
                     .attr("y", (d, i) => (6+barWindowYScale(d[1]))) // latitude
                     .attr("width", barWindowXScale.bandwidth())
-                    .attr("height", d => (barWindowYScale(d[0]) - barWindowYScale(d[1])));
+                    .attr("height", d => (barWindowYScale(d[0]) - barWindowYScale(d[1])))
 
-                explainerBars.exit().remove();
+                    .on("mouseover", function(d) {
+                        let theBar = d3.select(this);
+                        theBar
+                            .transition()
+                            .attr("stroke", "#EEEEEE")
+                            .attr("stroke-width", 5);
 
-                console.log(theData, theCountries, series, explainerBars);
+
+                        let barClasses = d3.select(this).attr("class").split(" ");
+                        let barCountry = barClasses.slice(1, barClasses.length > 3 ? barClasses.length - 1 : 2);
+                        let barCountryString = '';
+                        barCountry.forEach(function(e) {
+                            barCountryString += e + ' ';
+                        });
+                        barCountryString = barCountryString.trim();
+
+                        let tmp = Array.from(theSelected._groups[0]).map(s => s.__data__.properties);//.find(s => s.name === barCountryString);
+                        barCountryCode = tmp.find(e => e.NAME_ENGL === barCountryString).ISO3_CODE;
+                        d3.select("#path-" + barCountryCode)
+                            .style("stroke-width", 10)
+
+                        /*
+                        tooltip.style("opacity", 1)
+                            .html(function(f){
+                                console.log(d, theBar.attr("class").split(' ').slice(-1)[0]);
+                                return `${classes[keys.indexOf(theBar.attr("class").split(' ').slice(-1)[0])]}: ${d.data[theBar.attr("class").split(' ').slice(-1)[0]]}`;
+                            })
+                            .style('left', (d3.event.pageX + 10) + 'px')
+                            .style('top', (d3.event.pageY ) + 'px')
+                            .style('display', 'inline-block')
+
+                         */
+                    })
+                    .on("mouseout", function(d) {
+                        d3.select(this)
+                            .transition()
+                            .attr("stroke-width", 0);
+
+                        let barClasses = d3.select(this).attr("class").split(" ");
+                        let barCountry = barClasses.slice(1, barClasses.length > 3 ? barClasses.length - 1 : 2);
+                        let barCountryString = '';
+                        barCountry.forEach(function(e) {
+                            barCountryString += e + ' ';
+                        });
+                        barCountryString = barCountryString.trim();
+
+                        let tmp = Array.from(theSelected._groups[0]).map(s => s.__data__.properties);//.find(s => s.name === barCountryString);
+                        barCountryCode = tmp.find(e => e.NAME_ENGL === barCountryString).ISO3_CODE;
+                        d3.select("#path-" + barCountryCode)
+                            .style("stroke-width", 5)
+
+                       // tooltip.style("opacity", 0);
+                    });
+
+                index = -1;
+                explainerBars.exit()
+                    .remove()
+                .merge(explainerBars)
+                    .attr("class", (d, i) => { index += 1; return (`bar ${d.data.country} ${keys[index % 7]}`)});
+
+                let happinessText = d3.selectAll(".explainer#corruptionPerception")
+                    .selectAll("text").data(theData);
+
+                happinessText.enter()
+                    .append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("font-size", "1em")
+                    .attr("fill", d3.color("grey").darker())
+
+                .merge(happinessText)
+                    .text(d => {return (d.happiness_score.toFixed(2))})
+                    .attr("class", d => d.country)
+                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth()/2)) // longitude
+                    .attr("y", (d, i) => {return d3.select(d3.selectAll("rect." + d.country.replace(/ /g,'.'))._groups[0][6]).attr("y") - 5})
+                    .style("stroke", "black");
+
+                happinessText.exit()
+                    .attr("class", d => d.country)
+                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth()/2)) // longitude
+                    .attr("y", (d, i) => {return d3.select("rect.corruptionPerception." + d.country.replace(/ /g,'.')).attr("y")})
+                    .remove();
+                /*
+                    .append("text")
+                    .text(d => Math.round(d.data.happiness*100)/100)
+                    .attr("font-size", d => d.data.happiness/3 + "em")
+                    .attr("font-weight", "bold")
+                    .attr("fill", d3.color("black").darker())
+                    .attr("text-anchor", "middle")
+                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
+                    .attr("y", (d, i) => (6+barWindowYScale(d[1]))); // latitude
+                    //.attr("x", (d,i) => (margins.left - 10 + widthSpacingCoefficient * width * (i % columns))) // longitude
+                    //.attr("y", (d, i) => (heightSpacingCoefficient * height * Math.floor(i / columns) + yScale(d[1]) - 5)) // latitude;
+                    */
             }
 
             function switchmode(option) {
