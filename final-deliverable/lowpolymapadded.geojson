@@ -23570,7 +23570,7 @@
         "CNTR_NAME": "République Démocratique du Congo-Kongo-Kongó-Kongu-Kongo",
         "ISO3_CODE": "COD",
         "CNTR_ID": "CD",
-        "NAME_ENGL": "Congo (Kinshasa)",
+        "NAME_ENGL": "Congo Kinshasa",
         "FID": "CD"
       },
       "id": "CD"
@@ -23942,7 +23942,7 @@
         "CNTR_NAME": "Congo-Kongo-Kongó",
         "ISO3_CODE": "COG",
         "CNTR_ID": "CG",
-        "NAME_ENGL": "Congo (Brazzaville)",
+        "NAME_ENGL": "Congo Brazzaville",
         "FID": "CG"
       },
       "id": "CG"
