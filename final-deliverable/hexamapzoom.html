@@ -314,7 +314,7 @@
         Promise.all([worldmap, grid, data, regions]).then(function (values) {
             function updateBars() {
 
-                let theSelected = d3.selectAll(".Active");
+                let theSelected = d3.selectAll(".ActiveSituated");
                 // console.log(theSelected);
                 let keys = ["dystopia_score",
                     "gdp",
@@ -606,6 +606,8 @@
 
                 d3.selectAll("path")
                     .classed("Active", false);
+
+                updateBars();
 
             }
 

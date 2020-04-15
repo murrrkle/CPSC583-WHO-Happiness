@@ -43,6 +43,7 @@ function generateRadial(object, values) {
         let bbox = object.getBBox();
         let centroid = [bbox.x + bbox.width/2, bbox.y + bbox.height/2];
 
+
         // Generate radial plot
         let t = d3.select(object).data()[0];
         let container = d3.select("#" + t.properties.ISO3_CODE);
