@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <style>
-    #path .active{
+    #path .active {
         fill: orange;
     }
 
@@ -17,638 +17,617 @@
 </head>
 <body>
 
-    <div id="mapcontainer" ></div>
-    <div id="tooltipdev"></div>
-    <script>
-        //Adapted from:
-        //http://datawanderings.com/2018/10/28/making-a-map-in-d3-js-v-5/
-        //Map data retrieved from:
-        //https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/countries
+<div id="mapcontainer"></div>
+<div id="tooltipdev"></div>
+<script>
+    //Adapted from:
+    //http://datawanderings.com/2018/10/28/making-a-map-in-d3-js-v-5/
+    //Map data retrieved from:
+    //https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/countries
 
-        //Grid Layout and parts of this code is also adapted from
-        //https://observablehq.com/@karimdouieb/world-tile-grid-map
+    //Grid Layout and parts of this code is also adapted from
+    //https://observablehq.com/@karimdouieb/world-tile-grid-map
 
-        const zoom = d3.zoom()
-            .scaleExtent([1, 8])
-            .on("zoom", zoomed);
+    const zoom = d3.zoom()
+        .scaleExtent([1, 8])
+        .on("zoom", zoomed);
 
-        const barWindowWidth = 300, barWindowHeight = 200;
-        const barWindowMargins = {
-            top: 10,
-            bottom: 20,
-            left: 20,
-            right: 0
+    const barWindowWidth = 300, barWindowHeight = 200;
+    const barWindowMargins = {
+        top: 10,
+        bottom: 20,
+        left: 20,
+        right: 0
+    };
+
+    var block = false;
+    var w = 1800;
+    var h = 800;
+    var margintop = 60;
+    var marginside = 500;
+    var viewbox = d3.select("#mapcontainer")
+        .append("svg")
+        .attr("preserveAspectRatio", "xMinYMin meet")
+        .attr("viewBox", "0 0 " + w + " " + h)
+        .style("background", "#c9e8fd")
+
+    //   .classed("svg-content", true);
+
+    const svg = viewbox.append("g")
+        .attr("id", "svgcontainer");
+
+    viewbox.call(zoom);
+
+    //The following functions come for zoom implementation
+    //https://observablehq.com/@d3/zoom-to-bounding-box
+    function reset() {
+        viewbox.transition().duration(750).call(
+            zoom.transform,
+            d3.zoomIdentity,
+            d3.zoomTransform(viewbox.node()).invert([w / 2, h / 2])
+        );
+    }
+
+    function clicked(d) {
+        const [[x0, y0], [x1, y1]] = path.bounds(d);
+        d3.event.stopPropagation();
+        viewbox.transition().duration(750).call(
+            zoom.transform,
+            d3.zoomIdentity
+                .translate(w / 2, h / 2)
+                .scale(Math.min(8, 0.9 / Math.max((x1 - x0) / w, (y1 - y0) / h)))
+                .translate(-(x0 + x1) / 2, -(y0 + y1) / 2),
+            d3.mouse(viewbox.node())
+        );
+    }
+
+    function zoomed() {
+        const {transform} = d3.event;
+        svg.attr("transform", transform);
+        svg.attr("stroke-width", 1 / transform.k);
+    }
+
+    //end of copied code
+
+    //Modifed from previous code block
+    function clickedbox(x0, y0, x1, y1) {
+        d3.event.stopPropagation();
+        viewbox.transition().duration(750).call(
+            zoom.transform,
+            d3.zoomIdentity
+                .translate(w / 2, h / 2)
+                .scale(Math.min(8, 0.9 / Math.max((x1 - x0) / w, (y1 - y0) / h)))
+                .translate(-(x0 + x1) / 2, -(y0 + y1) / 2),
+            d3.mouse(viewbox.node())
+        );
+    }
+
+
+    var projection = d3.geoMercator()
+        .translate([w / 2, h / 2])
+        .scale(175)
+        .center([0, 40]);
+
+    var path = d3.geoPath().projection(projection);
+
+    var worldmap = d3.json("lowpolymapadded.geojson");
+
+    var data = d3.csv('data.csv', function (d) {
+        return {
+            country: d.Country,
+            happiness_score: +d["Happiness score"],
+            dystopia_score: +d["Dystopia (1.88) + residual"],
+            values: [+d["Explained by: GDP per capita"], +d["Explained by: Social support"],
+                +d["Explained by: Healthy life expectancy"], +d["Explained by: Freedom to make life choices"], +d["Explained by: Generosity"],
+                +d["Explained by: Perceptions of corruption"]],
+            gdp: +d["Explained by: GDP per capita"],
+            socialSupport: +d["Explained by: Social support"],
+            lifeExpectancy: +d["Explained by: Healthy life expectancy"],
+            choiceFreedom: +d["Explained by: Freedom to make life choices"],
+            generosity: +d["Explained by: Generosity"],
+            corruptionPerception: +d["Explained by: Perceptions of corruption"]
         };
+    })
 
-        var block = false;
-        var w = 1800;
-        var h = 800;
-        var margintop = 60;
-        var marginside = 500;
-        var viewbox = d3.select("#mapcontainer")
-            .append("svg")
-            .attr("preserveAspectRatio", "xMinYMin meet")
-            .attr("viewBox", "0 0 " + w + " " + h)
-            .style("background", "#c9e8fd")
+    const classes = ["Dystopia (1.88) + Residual",
+        "Explained by: GDP per capita",
+        "Explained by: Social support",
+        "Explained by: Healthy life expectancy",
+        "Explained by: Freedom to make life choices",
+        "Explained by: Generosity",
+        "Explained by: Perceptions of corruption"];
 
-        //   .classed("svg-content", true);
+    let keys = ["dystopia_score",
+        "gdp",
+        "socialSupport",
+        "lifeExpectancy",
+        "choiceFreedom",
+        "generosity",
+        "corruptionPerception"];
 
-        const svg = viewbox.append("g")
-            .attr("id", "svgcontainer");
+    var grid = d3.json("mygrid6.json");
 
-        viewbox.call(zoom);
+    var regions = d3.json("all.json");
 
-        //The following functions come for zoom implementation
-        //https://observablehq.com/@d3/zoom-to-bounding-box
-        function reset() {
-            viewbox.transition().duration(750).call(
-                zoom.transform,
-                d3.zoomIdentity,
-                d3.zoomTransform(viewbox.node()).invert([w / 2, h / 2])
-            );
-        }
+    var palette = d3.schemeSet1;
 
-        function clicked(d) {
-            const [[x0, y0], [x1, y1]] = path.bounds(d);
-            d3.event.stopPropagation();
-            viewbox.transition().duration(750).call(
-                zoom.transform,
-                d3.zoomIdentity
-                    .translate(w / 2, h / 2)
-                    .scale(Math.min(8, 0.9 / Math.max((x1 - x0) / w, (y1 - y0) / h)))
-                    .translate(-(x0 + x1) / 2, -(y0 + y1) / 2),
-                d3.mouse(viewbox.node())
-            );
-        }
-
-        function zoomed() {
-            const {transform} = d3.event;
-            svg.attr("transform", transform);
-            svg.attr("stroke-width", 1 / transform.k);
-        }
-
-        //end of copied code
-
-        //Modifed from previous code block
-        function clickedbox(x0, y0, x1, y1) {
-            d3.event.stopPropagation();
-            viewbox.transition().duration(750).call(
-                zoom.transform,
-                d3.zoomIdentity
-                    .translate(w / 2, h / 2)
-                    .scale(Math.min(8, 0.9 / Math.max((x1 - x0) / w, (y1 - y0) / h)))
-                    .translate(-(x0 + x1) / 2, -(y0 + y1) / 2),
-                d3.mouse(viewbox.node())
-            );
-        }
+    var spacing = Math.min(h / 27, w / 31);
+    var size = spacing / 2;
+    var opp = Math.sin(Math.PI / 6) * size;
+    var adj = Math.cos(Math.PI / 6) * size;
 
 
-        var projection = d3.geoMercator()
-            .translate([w/2, h/2])
-            .scale(175)
-            .center([0,40]);
+    var colorscale = d3.scaleSequential([0, 8], d3.interpolateViridis)
+        .nice();
 
-        var path = d3.geoPath().projection(projection);
 
-        var worldmap = d3.json("lowpolymapadded.geojson");
+    var buttonpath = d3.path();
+    let btnmid = [size * 2 + 15, size * 2 + 15];
+    let btntop = {
+        "x": btnmid[0],
+        "y": btnmid[1] - size * 2
+    }
+    let btntopleft = {
+        "x": btnmid[0] + adj * 2,
+        "y": btnmid[1] - opp * 2
+    }
+    let btnbottomleft = {
+        "x": btnmid[0] + adj * 2,
+        "y": btnmid[1] + opp * 2
+    }
+    let btnbottom = {
+        "x": btnmid[0],
+        "y": btnmid[1] + size * 2
+    }
+    let btnbottomright = {
+        "x": btnmid[0] - adj * 2,
+        "y": btnmid[1] + opp * 2
+    }
+    let btntopright = {
+        "x": btnmid[0] - adj * 2,
+        "y": btnmid[1] - opp * 2
+    }
+    buttonpath.moveTo(btntop.x, btntop.y);
+    buttonpath.lineTo(btntopleft.x, btntopleft.y);
+    buttonpath.lineTo(btnbottomleft.x, btnbottomleft.y);
+    buttonpath.lineTo(btnbottom.x, btnbottom.y);
+    buttonpath.lineTo(btnbottomright.x, btnbottomright.y);
+    buttonpath.lineTo(btntopright.x, btntopleft.y);
+    buttonpath.closePath();
 
-        var data = d3.csv('data.csv', function(d) {
-            return {
-                country : d.Country,
-                happiness_score : +d["Happiness score"],
-                dystopia_score : +d["Dystopia (1.88) + residual"],
-                values : [+d["Explained by: GDP per capita"], +d["Explained by: Social support"],
-                    +d["Explained by: Healthy life expectancy"], +d["Explained by: Freedom to make life choices"], +d["Explained by: Generosity"],
-                    +d["Explained by: Perceptions of corruption"]],
-                gdp :                   +d["Explained by: GDP per capita"],
-                socialSupport :         +d["Explained by: Social support"],
-                lifeExpectancy :        +d["Explained by: Healthy life expectancy"],
-                choiceFreedom :         +d["Explained by: Freedom to make life choices"],
-                generosity :            +d["Explained by: Generosity"],
-                corruptionPerception :  +d["Explained by: Perceptions of corruption"]
-            };
-        })
+    var fraction = 4;
 
-        const classes = ["Dystopia (1.88) + Residual",
-            "Explained by: GDP per capita",
+    var btnpanel1 = d3.path();
+    btnpanel1.moveTo(btnmid[0] - (size * 2), btnmid[1] - (size * 2));
+    btnpanel1.lineTo(btnmid[0] - (size * 2), btnmid[1] + (size * 2));
+    btnpanel1.lineTo(btnmid[0] - (size) - 2, btnmid[1] + (size * 2) - (size / fraction));
+    btnpanel1.lineTo(btnmid[0] - (size) - 2, btnmid[1] - (size * 2) + (size / fraction));
+    btnpanel1.closePath();
+
+    var btnpanel2 = d3.path();
+    btnpanel2.moveTo(btnmid[0] - 2, btnmid[1] - (size * 2));
+    btnpanel2.lineTo(btnmid[0] - 2, btnmid[1] + (size * 2));
+    btnpanel2.lineTo(btnmid[0] - (size) + 2, btnmid[1] + (size * 2) - (size / fraction));
+    btnpanel2.lineTo(btnmid[0] - (size) + 2, btnmid[1] - (size * 2) + (size / fraction));
+    btnpanel2.closePath();
+
+    var btnpanel3 = d3.path();
+    btnpanel3.moveTo(btnmid[0] + 2, btnmid[1] - (size * 2));
+    btnpanel3.lineTo(btnmid[0] + 2, btnmid[1] + (size * 2));
+    btnpanel3.lineTo(btnmid[0] + (size) - 2, btnmid[1] + (size * 2) - (size / fraction));
+    btnpanel3.lineTo(btnmid[0] + (size) - 2, btnmid[1] - (size * 2) + (size / fraction));
+    btnpanel3.closePath();
+
+    var btnpanel4 = d3.path();
+    btnpanel4.moveTo(btnmid[0] + (size * 2), btnmid[1] - (size * 2));
+    btnpanel4.lineTo(btnmid[0] + (size * 2), btnmid[1] + (size * 2));
+    btnpanel4.lineTo(btnmid[0] + (size) + 2, btnmid[1] + (size * 2) - (size / fraction));
+    btnpanel4.lineTo(btnmid[0] + (size) + 2, btnmid[1] - (size * 2) + (size / fraction));
+    btnpanel4.closePath();
+
+
+    //This code for building tooltips as well some other related code later on is adapted from:
+    //https://www.d3-graph-gallery.com/graph/interactivity_tooltip.html
+    var tooltip = d3.select("#mapcontainer")
+        .append("div")
+        .style("opacity", 0)
+        .attr("class", "tooltip")
+        .style("position", "absolute")
+        .style("background-color", "white")
+        .style("z-index", "10")
+        .style("border", "solid")
+        .style("stroke", 2)
+        .style("stroke-color", "black")
+        .style("border-width", "2px")
+        .style("border-radius", "5px")
+        .style("padding", "5px")
+        .style("pointer-events", "none");
+
+    var bg = svg.append("rect")
+        .attr("x", -2 * w)
+        .attr("y", -2 * h)
+        .attr("width", w * 6)
+        .attr("height", h * 6)
+        .style("fill", "#c9e8fd");
+
+
+    // Consts for the radial plots
+    const width = 30,
+        height = width,
+        arcMinRadius = 7,
+        chartRadius = height / 2,
+        imageScaleFactor = 7,
+        PI = Math.PI,
+        arcPadding = 0.5,
+        numTicks = 10,
+        numArcs = 6,
+        arcWidth = (chartRadius - arcMinRadius - numArcs * arcPadding) / numArcs,
+        columns = ["Explained by: GDP per capita",
             "Explained by: Social support",
             "Explained by: Healthy life expectancy",
             "Explained by: Freedom to make life choices",
             "Explained by: Generosity",
             "Explained by: Perceptions of corruption"];
 
-        var grid = d3.json("mygrid6.json");
+    const barColor = d3.scaleOrdinal().domain(columns)
+        .range(d3.schemeCategory10);
 
-        var regions = d3.json("all.json");
+    // Define the scale
+    let radialScale;
+    data.then(function (data) {
+        radialScale = d3.scaleLinear()
+            .domain([0, d3.max(data, d => d3.max(d.values)) * 1.1]) // Domain is 0 to happiness score (max value)
+            .range([0, 2 * PI]);
+    }); // Range is 0 to 2pi, or the full radians of a circle
 
-        var palette = d3.schemeSet1;
+    // Define an arc function to generate curves for all of the bars
+    let arc = d3.arc()
+        .innerRadius(function (d, i) {
+            return getInnerRadius(i);
+        })
+        .outerRadius(function (d, i) {
+            return getOuterRadius(i);
+        })
+        .startAngle(0)
+        .endAngle(function (d, i) {
+            return radialScale(d);
+        });
 
-        var spacing = Math.min(h/27, w/31);
-        var size = spacing/2;
-        var opp = Math.sin(Math.PI/6)*size;
-        var adj = Math.cos(Math.PI/6)*size;
+    let situatedOverlay = svg.append("g")
+        .attr("class", "situatedOverlay");
 
+    let mapOverlay = svg.append("g")
+        .attr("class", "mapOverlay");
 
-        var colorscale = d3.scaleSequential([0,8], d3.interpolateViridis)
-            .nice();
+    let clip = svg.append("defs");
 
+    // setting up dimensions and scale for barWindow
+    let barWindow = d3.select("svg").append("g")
+        .attr("class", "barWindow");
 
-        var buttonpath = d3.path();
-        let btnmid = [size*2 + 15, size*2 + 15];
-        let btntop = {
-            "x": btnmid[0],
-            "y": btnmid[1]-size*2
-        }
-        let btntopleft = {
-            "x": btnmid[0] + adj*2,
-            "y": btnmid[1] - opp*2
-        }
-        let btnbottomleft = {
-            "x": btnmid[0] + adj*2,
-            "y": btnmid[1] + opp*2
-        }
-        let btnbottom = {
-            "x": btnmid[0],
-            "y": btnmid[1] + size*2
-        }
-        let btnbottomright = {
-            "x": btnmid[0] - adj*2,
-            "y": btnmid[1] + opp*2
-        }
-        let btntopright = {
-            "x": btnmid[0] - adj*2,
-            "y": btnmid[1] - opp*2
-        }
-        buttonpath.moveTo(btntop.x, btntop.y);
-        buttonpath.lineTo(btntopleft.x, btntopleft.y);
-        buttonpath.lineTo(btnbottomleft.x, btnbottomleft.y);
-        buttonpath.lineTo(btnbottom.x, btnbottom.y);
-        buttonpath.lineTo(btnbottomright.x, btnbottomright.y);
-        buttonpath.lineTo(btntopright.x, btntopleft.y);
-        buttonpath.closePath();
+    let barLegend = barWindow.append('g')
+        .attr("class", "barWindowLegend")
+        .style("opacity", 0);
 
-        var fraction = 4;
+    let barBackground = barLegend.append("rect")
+        .attr("class", "barBackground")
+        .attr("x", w - barWindowWidth - 20)
+        .attr("y", barWindowHeight + 26)
+        .attr("width", barWindowWidth + 20)
+        .attr("height", 140)
+        .style("fill", "#EEEEEE");
 
-        var btnpanel1 = d3.path();
-        btnpanel1.moveTo(btnmid[0]-(size*2), btnmid[1]-(size*2));
-        btnpanel1.lineTo(btnmid[0]-(size*2), btnmid[1]+(size*2));
-        btnpanel1.lineTo(btnmid[0]-(size)-2, btnmid[1]+(size*2)-(size/fraction));
-        btnpanel1.lineTo(btnmid[0]-(size)-2, btnmid[1]-(size*2)+(size/fraction));
-        btnpanel1.closePath();
+    barLegendLines = barLegend.selectAll("g").data(keys);
+    barLegendLines.enter()
+        .append('g')
+        .attr("class", "legendLine")
+        .append('rect')
+        .attr("x", w - barWindowWidth - 15)
+        .attr("y", (d, i) => barWindowHeight + 26 + 20 * i)
+        .attr("width", 10)
+        .attr("height", 10)
+        .style("fill", (d, i) => barColor(i));
 
-        var btnpanel2 = d3.path();
-        btnpanel2.moveTo(btnmid[0]-2, btnmid[1]-(size*2));
-        btnpanel2.lineTo(btnmid[0]-2, btnmid[1]+(size*2));
-        btnpanel2.lineTo(btnmid[0]-(size) + 2, btnmid[1]+(size*2)-(size/fraction));
-        btnpanel2.lineTo(btnmid[0]-(size) + 2, btnmid[1]-(size*2)+(size/fraction));
-        btnpanel2.closePath();
+    barLegend.selectAll(".legendLine")
+        .append("text")
+        .text((d, i) => classes[i])
+        .attr("x", w - barWindowWidth)
+        .attr("y", (d, i) => barWindowHeight + 36 + 20 * i)
+        .attr("font-size", "1em")
+        .attr("fill", d3.color("grey").darker());
 
-        var btnpanel3 = d3.path();
-        btnpanel3.moveTo(btnmid[0]+2, btnmid[1]-(size*2));
-        btnpanel3.lineTo(btnmid[0]+2, btnmid[1]+(size*2));
-        btnpanel3.lineTo(btnmid[0]+(size) - 2, btnmid[1]+(size*2)-(size/fraction));
-        btnpanel3.lineTo(btnmid[0]+(size) - 2, btnmid[1]-(size*2)+(size/fraction));
-        btnpanel3.closePath();
+    barWindow.append("rect")
+        .attr("class", "barBackground")
+        .attr("x", w - barWindowWidth - 20)
+        .attr("width", barWindowWidth + 20)
+        .attr("height", barWindowHeight + 26)
+        .style("fill", "#EEEEEE")
+        .on("mouseover", function (d) {
+            d3.select(this).transition()
+                .style("opacity", 0.6);
+            barLegend.transition().style("opacity", 1);
+            barBackground.transition().style("opacity", 0.6);
+        })
+        .on("mouseout", function (d) {
+            d3.select(this).transition()
+                .style("opacity", 1);
+            barLegend.transition().style("opacity", 0)
+            barBackground.transition().style("opacity", 0);
+        });
 
-        var btnpanel4 = d3.path();
-        btnpanel4.moveTo(btnmid[0]+(size*2), btnmid[1]-(size*2));
-        btnpanel4.lineTo(btnmid[0]+(size*2), btnmid[1]+(size*2));
-        btnpanel4.lineTo(btnmid[0]+(size) + 2, btnmid[1]+(size*2)-(size/fraction));
-        btnpanel4.lineTo(btnmid[0]+(size) + 2, btnmid[1]-(size*2)+(size/fraction));
-        btnpanel4.closePath();
+    barWindow.append("g")
+        .attr("class", "y-axis")
+        .attr("transform", translate(w - barWindowWidth, 6)).transition()
+        .call(d3.axisLeft(d3.scaleLinear([], [barWindowHeight, 0])));
 
-
-
-        //This code for building tooltips as well some other related code later on is adapted from:
-        //https://www.d3-graph-gallery.com/graph/interactivity_tooltip.html
-        var tooltip = d3.select("#mapcontainer")
-            .append("div")
-            .style("opacity", 0)
-            .attr("class", "tooltip")
-            .style("position", "absolute")
-            .style("background-color", "white")
-            .style("z-index", "10")
-            .style("border", "solid")
-            .style("stroke", 2)
-            .style("stroke-color", "black")
-            .style("border-width", "2px")
-            .style("border-radius", "5px")
-            .style("padding", "5px")
-            .style("pointer-events", "none");
-
-        var bg = svg.append("rect")
-            .attr("x", -2*w)
-            .attr("y", -2*h)
-            .attr("width", w*6)
-            .attr("height", h*6)
-            .style("fill", "#c9e8fd");
+    barWindow.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", translate(w - barWindowWidth, barWindowHeight + 6)).transition()
+        .call(d3.axisBottom(d3.scaleBand([], [0, barWindowWidth])));
 
 
-        // Consts for the radial plots
-        const width = 30,
-            height = width,
-            arcMinRadius = 7,
-            chartRadius = height / 2,
-            imageScaleFactor = 7,
-            PI = Math.PI,
-            arcPadding = 0.5,
-            numTicks = 10,
-            numArcs = 6,
-            arcWidth = (chartRadius - arcMinRadius - numArcs * arcPadding) / numArcs,
-            columns = ["Explained by: GDP per capita",
-                "Explained by: Social support",
-                "Explained by: Healthy life expectancy",
-                "Explained by: Freedom to make life choices",
-                "Explained by: Generosity",
-                "Explained by: Perceptions of corruption"];
+    Promise.all([worldmap, grid, data, regions]).then(function (values) {
+        function updateBars() {
 
-        const barColor = d3.scaleOrdinal().domain(columns)
-            .range(d3.schemeCategory10);
+            let theSelected = d3.selectAll(".ActiveSituated");
+            // console.log(theSelected);
 
-        // Define the scale
-        let radialScale;
-        data.then(function (data) {
-            radialScale = d3.scaleLinear()
-                .domain([0, d3.max(data, d => d3.max(d.values)) * 1.1]) // Domain is 0 to happiness score (max value)
-                .range([0, 2 * PI]);
-        }); // Range is 0 to 2pi, or the full radians of a circle
+            let stack = d3.stack()
+                .keys(keys);
 
-        // Define an arc function to generate curves for all of the bars
-        let arc = d3.arc()
-            .innerRadius(function (d, i) {return getInnerRadius(i);})
-            .outerRadius(function (d, i) {return getOuterRadius(i);})
-            .startAngle(0)
-            .endAngle(function (d, i) {return radialScale(d);});
+            // extract just the names/codes of the selected countries
+            let theCountries = Array.from(theSelected._groups[0]).map(s => s.__data__.properties.NAME_ENGL);
+            let theCountryCodes = Array.from(theSelected._groups[0]).map(s => s.__data__.properties.ISO3_CODE);
 
-        let situatedOverlay = svg.append("g")
-            .attr("class", "situatedOverlay");
+            // look up their actual data from the data csv using their name and make an array of these.
+            let theData = theCountries.map(n => values[2].find(d => d.country === n));
+            let series = stack(theData); // this will be the data used to generate the stacked bars
 
-        let mapOverlay = svg.append("g")
-            .attr("class", "mapOverlay");
+            // BarWindow xScale (dependent on selections)
+            let barWindowXdomain = theCountryCodes;
+            let barWindowXScale = d3.scaleBand(barWindowXdomain, [0, barWindowWidth])
+                .padding(0.5);
 
-        let clip = svg.append("defs");
+            //console.log(theSelected, theData);
+            let maxScore = Math.max.apply(Math, theData.map(d => d.happiness_score));
 
-        // setting up dimensions and scale for barWindow
-        let barWindow = d3.select("svg").append("g")
-            .attr("class", "barWindow");
-
-        barWindow.append("rect")
-            .attr("class", "background")
-            .attr("x", w-barWindowWidth-20)
-            .attr("width", barWindowWidth+20)
-            .attr("height", barWindowHeight+26)
-            .style("fill", "#EEEEEE")
-            .on("mouseover", function(d) {
-                d3.select(this).transition()
-                    .style("opacity", 0.6);
-            })
-            .on("mouseout", function(d) {
-                d3.select(this).transition()
-                    .style("opacity", 1);
-            });
-
-        barWindow.append("g")
-            .attr("class", "y-axis")
-            .attr("transform", translate(w-barWindowWidth, 6)).transition()
-            .call(d3.axisLeft(d3.scaleLinear([], [barWindowHeight, 0])));
-
-        barWindow.append("g")
-            .attr("class", "x-axis")
-            .attr("transform", translate(w-barWindowWidth, barWindowHeight+6)).transition()
-            .call(d3.axisBottom(d3.scaleBand([], [0, barWindowWidth])));
+            // BarWindow yScale.
+            let barWindowYScale = d3.scaleLinear([0, maxScore + 0.5], [barWindowHeight, 0])
+                .nice();
 
 
-        Promise.all([worldmap, grid, data, regions]).then(function (values) {
-            function updateBars() {
+            d3.select(".y-axis").transition()
+                .call(d3.axisLeft(barWindowYScale).ticks(5));
 
-                let theSelected = d3.selectAll(".ActiveSituated");
-                // console.log(theSelected);
-                let keys = ["dystopia_score",
-                    "gdp",
-                    "socialSupport",
-                    "lifeExpectancy",
-                    "choiceFreedom",
-                    "generosity",
-                    "corruptionPerception"];
-                let stack = d3.stack()
-                    .keys(keys);
+            d3.select(".x-axis").transition()
+                .call(d3.axisBottom(barWindowXScale));
 
-                // extract just the names/codes of the selected countries
-                let theCountries = Array.from(theSelected._groups[0]).map(s => s.__data__.properties.NAME_ENGL);
-                let theCountryCodes = Array.from(theSelected._groups[0]).map(s => s.__data__.properties.ISO3_CODE);
+            // Data Join with the selected data
+            let explainers = barWindow.selectAll(".explainer")
+                .data(series);
 
-                // look up their actual data from the data csv using their name and make an array of these.
-                let theData = theCountries.map(n => values[2].find(d => d.country === n));
-                let series = stack(theData); // this will be the data used to generate the stacked bars
-
-                // BarWindow xScale (dependent on selections)
-                let barWindowXdomain = theCountryCodes;
-                let barWindowXScale = d3.scaleBand(barWindowXdomain, [0, barWindowWidth])
-                    .padding(0.5);
-
-                //console.log(theSelected, theData);
-                let maxScore =  Math.max.apply(Math, theData.map(d => d.happiness_score));
-
-                // BarWindow yScale.
-                let barWindowYScale = d3.scaleLinear([0, maxScore + 0.5], [barWindowHeight, 0])
-                    .nice();
-
-
-                d3.select(".y-axis").transition()
-                    .call(d3.axisLeft(barWindowYScale).ticks(5));
-
-                d3.select(".x-axis").transition()
-                    .call(d3.axisBottom(barWindowXScale));
-
-                // Data Join with the selected data
-                let explainers = barWindow.selectAll(".explainer")
-                    .data(series);
-
-                // Nested Join for making bars for each explainer
-                let explainerBars = explainers.enter().append("g")
-                    .attr("class", "explainer")
-                    .attr("id", (d, i) => {return (keys[i])})
-                    //.attr("transform", translate(barWindowMargins.left, barWindowMargins.bottom))
-                    .attr("fill", (d, i) => barColor(i))
+            // Nested Join for making bars for each explainer
+            let explainerBars = explainers.enter().append("g")
+                .attr("class", "explainer")
+                .attr("id", (d, i) => {
+                    return (keys[i])
+                })
+                //.attr("transform", translate(barWindowMargins.left, barWindowMargins.bottom))
+                .attr("fill", (d, i) => barColor(i))
                 .merge(explainers)
-                    .selectAll(".bar").data(d => (d));
-/*
-                explainerBars = explainerBars
-                    .append("g")
-                    .attr("class", (d, i) => {index += 1; return ( "barGroup " + d.data.country.replace(/ /g,'') + ' ' + keys[Math.floor(index / (theData.length > 0 ? theData.length : 1))]);})
-                index = -1;
-*/
-                let index = -1;
-                // draw the bars
-                explainerBars.enter().append("rect")
+                .selectAll(".bar").data(d => (d));
+            /*
+                            explainerBars = explainerBars
+                                .append("g")
+                                .attr("class", (d, i) => {index += 1; return ( "barGroup " + d.data.country.replace(/ /g,'') + ' ' + keys[Math.floor(index / (theData.length > 0 ? theData.length : 1))]);})
+                            index = -1;
+            */
+            let index = -1;
+            // draw the bars
+            explainerBars.enter().append("rect")
                 .merge(explainerBars)
-                    .attr("class", (d, i) => {
-                        index += 1;
-                        console.log(explainerBars);
-                        return (`bar ${d.data.country} ${keys[index % 7]}`);})
-                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
-                    .attr("y", (d, i) => (6+barWindowYScale(d[1]))) // latitude
-                    .attr("width", barWindowXScale.bandwidth())
-                    .attr("height", d => (barWindowYScale(d[0]) - barWindowYScale(d[1])))
+                .attr("class", (d, i) => {
+                    index += 1;
+                    console.log(explainerBars);
+                    return (`bar ${d.data.country} ${keys[index % 7]}`);
+                })
+                .attr("x", (d, i) => (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
+                .attr("y", (d, i) => (6 + barWindowYScale(d[1]))) // latitude
+                .attr("width", barWindowXScale.bandwidth())
+                .attr("height", d => (barWindowYScale(d[0]) - barWindowYScale(d[1])))
 
-                    .on("mouseover", function(d) {
-                        let theBar = d3.select(this);
-                        theBar
-                            .transition()
-                            .attr("stroke", "#EEEEEE")
-                            .attr("stroke-width", 5);
+                .on("mouseover", function (d) {
+                    let theBar = d3.select(this);
+                    theBar
+                        .transition()
+                        .attr("stroke", "#EEEEEE")
+                        .attr("stroke-width", 5);
 
 
-                        let barClasses = d3.select(this).attr("class").split(" ");
-                        let barCountry = barClasses.slice(1, barClasses.length > 3 ? barClasses.length - 1 : 2);
-                        let barCountryString = '';
-                        barCountry.forEach(function(e) {
-                            barCountryString += e + ' ';
-                        });
-                        barCountryString = barCountryString.trim();
-
-                        let tmp = Array.from(theSelected._groups[0]).map(s => s.__data__.properties);//.find(s => s.name === barCountryString);
-                        barCountryCode = tmp.find(e => e.NAME_ENGL === barCountryString).ISO3_CODE;
-                        d3.select("#path-" + barCountryCode)
-                            .style("stroke-width", 10)
-
-                        /*
-                        tooltip.style("opacity", 1)
-                            .html(function(f){
-                                console.log(d, theBar.attr("class").split(' ').slice(-1)[0]);
-                                return `${classes[keys.indexOf(theBar.attr("class").split(' ').slice(-1)[0])]}: ${d.data[theBar.attr("class").split(' ').slice(-1)[0]]}`;
-                            })
-                            .style('left', (d3.event.pageX + 10) + 'px')
-                            .style('top', (d3.event.pageY ) + 'px')
-                            .style('display', 'inline-block')
-
-                         */
-                    })
-                    .on("mouseout", function(d) {
-                        d3.select(this)
-                            .transition()
-                            .attr("stroke-width", 0);
-
-                        let barClasses = d3.select(this).attr("class").split(" ");
-                        let barCountry = barClasses.slice(1, barClasses.length > 3 ? barClasses.length - 1 : 2);
-                        let barCountryString = '';
-                        barCountry.forEach(function(e) {
-                            barCountryString += e + ' ';
-                        });
-                        barCountryString = barCountryString.trim();
-
-                        let tmp = Array.from(theSelected._groups[0]).map(s => s.__data__.properties);//.find(s => s.name === barCountryString);
-                        barCountryCode = tmp.find(e => e.NAME_ENGL === barCountryString).ISO3_CODE;
-                        d3.select("#path-" + barCountryCode)
-                            .style("stroke-width", 5)
-
-                       // tooltip.style("opacity", 0);
+                    let barClasses = d3.select(this).attr("class").split(" ");
+                    let barCountry = barClasses.slice(1, barClasses.length > 3 ? barClasses.length - 1 : 2);
+                    let barCountryString = '';
+                    barCountry.forEach(function (e) {
+                        barCountryString += e + ' ';
                     });
+                    barCountryString = barCountryString.trim();
 
-                index = -1;
-                explainerBars.exit()
-                    .remove()
+                    let tmp = Array.from(theSelected._groups[0]).map(s => s.__data__.properties);//.find(s => s.name === barCountryString);
+                    barCountryCode = tmp.find(e => e.NAME_ENGL === barCountryString).ISO3_CODE;
+                    d3.select("#path-" + barCountryCode)
+                        .style("stroke-width", 10)
+
+                    /*
+                    tooltip.style("opacity", 1)
+                        .html(function(f){
+                            console.log(d, theBar.attr("class").split(' ').slice(-1)[0]);
+                            return `${classes[keys.indexOf(theBar.attr("class").split(' ').slice(-1)[0])]}: ${d.data[theBar.attr("class").split(' ').slice(-1)[0]]}`;
+                        })
+                        .style('left', (d3.event.pageX + 10) + 'px')
+                        .style('top', (d3.event.pageY ) + 'px')
+                        .style('display', 'inline-block')
+
+                     */
+                })
+                .on("mouseout", function (d) {
+                    d3.select(this)
+                        .transition()
+                        .attr("stroke-width", 0);
+
+                    let barClasses = d3.select(this).attr("class").split(" ");
+                    let barCountry = barClasses.slice(1, barClasses.length > 3 ? barClasses.length - 1 : 2);
+                    let barCountryString = '';
+                    barCountry.forEach(function (e) {
+                        barCountryString += e + ' ';
+                    });
+                    barCountryString = barCountryString.trim();
+
+                    let tmp = Array.from(theSelected._groups[0]).map(s => s.__data__.properties);//.find(s => s.name === barCountryString);
+                    barCountryCode = tmp.find(e => e.NAME_ENGL === barCountryString).ISO3_CODE;
+                    d3.select("#path-" + barCountryCode)
+                        .style("stroke-width", 5)
+
+                    // tooltip.style("opacity", 0);
+                });
+
+            index = -1;
+            explainerBars.exit()
+                .remove()
                 .merge(explainerBars)
-                    .attr("class", (d, i) => { index += 1; return (`bar ${d.data.country} ${keys[index % 7]}`)});
+                .attr("class", (d, i) => {
+                    index += 1;
+                    return (`bar ${d.data.country} ${keys[index % 7]}`)
+                });
 
-                let happinessText = d3.selectAll(".explainer#corruptionPerception")
-                    .selectAll("text").data(theData);
+            let happinessText = d3.selectAll(".explainer#corruptionPerception")
+                .selectAll("text").data(theData);
 
-                happinessText.enter()
-                    .append("text")
-                    .attr("text-anchor", "middle")
-                    .attr("font-size", "1em")
-                    .attr("fill", d3.color("grey").darker())
+            happinessText.enter()
+                .append("text")
+                .attr("text-anchor", "middle")
+                .attr("font-size", "1em")
+                .attr("fill", d3.color("grey").darker())
 
                 .merge(happinessText)
-                    .text(d => {return (d.happiness_score.toFixed(2))})
-                    .attr("class", d => d.country)
-                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth()/2)) // longitude
-                    .attr("y", (d, i) => {return d3.select(d3.selectAll("rect." + d.country.replace(/ /g,'.'))._groups[0][6]).attr("y") - 5})
-                    .style("stroke", "black");
+                .text(d => {
+                    return (d.happiness_score.toFixed(2))
+                })
+                .attr("class", d => d.country)
+                .attr("x", (d, i) => (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2)) // longitude
+                .attr("y", (d, i) => {
+                    return d3.select(d3.selectAll("rect." + d.country.replace(/ /g, '.'))._groups[0][6]).attr("y") - 5
+                })
+                .style("stroke", "black");
 
-                happinessText.exit()
-                    .attr("class", d => d.country)
-                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth()/2)) // longitude
-                    .attr("y", (d, i) => {return d3.select("rect.corruptionPerception." + d.country.replace(/ /g,'.')).attr("y")})
-                    .remove();
-                /*
-                    .append("text")
-                    .text(d => Math.round(d.data.happiness*100)/100)
-                    .attr("font-size", d => d.data.happiness/3 + "em")
-                    .attr("font-weight", "bold")
-                    .attr("fill", d3.color("black").darker())
-                    .attr("text-anchor", "middle")
-                    .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
-                    .attr("y", (d, i) => (6+barWindowYScale(d[1]))); // latitude
-                    //.attr("x", (d,i) => (margins.left - 10 + widthSpacingCoefficient * width * (i % columns))) // longitude
-                    //.attr("y", (d, i) => (heightSpacingCoefficient * height * Math.floor(i / columns) + yScale(d[1]) - 5)) // latitude;
-                    */
-            }
+            happinessText.exit()
+                .attr("class", d => d.country)
+                .attr("x", (d, i) => (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2)) // longitude
+                .attr("y", (d, i) => {
+                    return d3.select("rect.corruptionPerception." + d.country.replace(/ /g, '.')).attr("y")
+                })
+                .remove();
+            /*
+                .append("text")
+                .text(d => Math.round(d.data.happiness*100)/100)
+                .attr("font-size", d => d.data.happiness/3 + "em")
+                .attr("font-weight", "bold")
+                .attr("fill", d3.color("black").darker())
+                .attr("text-anchor", "middle")
+                .attr("x", (d, i) => (w-barWindowWidth + barWindowXScale(barWindowXdomain[i]))) // longitude
+                .attr("y", (d, i) => (6+barWindowYScale(d[1]))); // latitude
+                //.attr("x", (d,i) => (margins.left - 10 + widthSpacingCoefficient * width * (i % columns))) // longitude
+                //.attr("y", (d, i) => (heightSpacingCoefficient * height * Math.floor(i / columns) + yScale(d[1]) - 5)) // latitude;
+                */
+        }
 
-            function switchmode(option) {
-                viewbox.selectAll("#button")
-                    .transition()
-                    .duration(2000)
-                    .attrTween('d', d => {
-                        let hex = buttonpath.toString();
-                        let panel = [];
-                        panel.push(btnpanel1.toString());
-                        panel.push(btnpanel2.toString());
-                        panel.push(btnpanel3.toString());
-                        panel.push(btnpanel4.toString());
+        function switchmode(option) {
+            viewbox.selectAll("#button")
+                .transition()
+                .duration(2000)
+                .attrTween('d', d => {
+                    let hex = buttonpath.toString();
+                    let panel = [];
+                    panel.push(btnpanel1.toString());
+                    panel.push(btnpanel2.toString());
+                    panel.push(btnpanel3.toString());
+                    panel.push(btnpanel4.toString());
 
+                    if (option) {
+                        return flubber.separate(hex, panel, {single: true})
+                    } else {
+                        return flubber.combine(panel, hex, {single: true})
+                    }
+                });
+
+
+            svg.selectAll(".countryname")
+                .transition()
+                .duration(2000)
+                .style("opacity", function (d) {
+                    var name = d.properties.NAME_ENGL;
+                    let retname = values[2].find(d => d.country === name);
+                    if (retname != null) {
                         if (option) {
-                            return flubber.separate(hex, panel, {single: true})
+                            return 0.9
                         } else {
-                            return flubber.combine(panel, hex, {single: true})
-                        }
-                    });
-
-
-                svg.selectAll(".countryname")
-                    .transition()
-                    .duration(2000)
-                    .style("opacity", function (d) {
-                        var name = d.properties.NAME_ENGL;
-                        let retname = values[2].find(d => d.country === name);
-                        if(retname != null){
-                            if(option){
-                                return 0.9
-                            }
-                            else{
-                                return 0
-                            }
-                        }
-                        else{
                             return 0
                         }
-                    })
+                    } else {
+                        return 0
+                    }
+                })
 
-                svg.selectAll(".country")
-                    .transition()
-                    .duration(2000)
-                    .style('stroke-width', function (d) {
-                        if(option){
-                            return 2;
-                        }
-                        return 0;
-                    })
-                    .attrTween('d', d => {
-                        let country = d.properties.ISO3_CODE;
-                        let gridcountry = values[1].find(d => d.code === country);
+            svg.selectAll(".country")
+                .transition()
+                .duration(2000)
+                .style('stroke-width', function (d) {
+                    if (option) {
+                        return 2;
+                    }
+                    return 0;
+                })
+                .attrTween('d', d => {
+                    let country = d.properties.ISO3_CODE;
+                    let gridcountry = values[1].find(d => d.code === country);
 
-                        var name = d.properties.NAME_ENGL;
-                        let retname = values[2].find(d => d.country === name);
-                        let tracked = true;
-                        let x, y;
-                        if(retname == null){
-                            tracked = false;
-                            x = 0;
-                            y = 0;
-                        }
-                        else{
-                             x = gridcountry.x;
-                             y = gridcountry.y;
-                        }
-
-
-                        let polyarr = d.geometry.coordinates;
-                        var filteredPolygons = d.geometry.coordinates.map(coordinates => path({
-                            type: 'Polygon',
-                            coordinates: coordinates
-                        }));
-                        let type = d.geometry.type;
-                        let shapefrom = [];
-                        let shapeto = [];
-                        if (type == "MultiPolygon") {
+                    var name = d.properties.NAME_ENGL;
+                    let retname = values[2].find(d => d.country === name);
+                    let tracked = true;
+                    let x, y;
+                    if (retname == null) {
+                        tracked = false;
+                        x = 0;
+                        y = 0;
+                    } else {
+                        x = gridcountry.x;
+                        y = gridcountry.y;
+                    }
 
 
-                            for (let el in polyarr) {
-                                shapefrom.push(filteredPolygons[el]);
-
-                                let j1;
-                                if(y % 2 == 1){
-                                    j1 = x*2+1;
-                                }
-                                else{
-                                    j1 = x*2;
-                                }
-                                let mid = [j1*spacing/2 +marginside, y*spacing +margintop];
-                                let top = {
-                                    "x": mid[0],
-                                    "y": mid[1]-size
-                                }
-                                let topleft = {
-                                    "x": mid[0] + adj,
-                                    "y": mid[1] - opp
-                                }
-                                let bottomleft = {
-                                    "x": mid[0] + adj,
-                                    "y": mid[1] + opp
-                                }
-                                let bottom = {
-                                    "x": mid[0],
-                                    "y": mid[1] + size
-                                }
-                                let bottomright = {
-                                    "x": mid[0] - adj,
-                                    "y": mid[1] + opp
-                                }
-                                let topright = {
-                                    "x": mid[0] - adj,
-                                    "y": mid[1] - opp
-                                }
-                                hex = d3.path();
-                                hex.moveTo(top.x, top.y);
-                                hex.lineTo(topleft.x, topleft.y);
-                                hex.lineTo(bottomleft.x, bottomleft.y);
-                                hex.lineTo(bottom.x, bottom.y);
-                                hex.lineTo(bottomright.x, bottomright.y);
-                                hex.lineTo(topright.x, topleft.y);
-                                hex.closePath();
-                                let sq = hex.toString();
-
-                                shape = d3.path();
-                                shape.moveTo(-1000,0);
-                                shape.lineTo(-1000,0.001);
-                                shape.lineTo(-1000.001,0.001);
-                                shape.closePath();
-                                shape = shape.toString();
-
-                                if(tracked){
-                                    shapeto.push(sq)
-                                }
-                                else{
-                                    shapeto.push(shape)
-                                }
-
-                            }
-
-                            shape = d3.path();
-                            shape.moveTo(0,0);
-                            shape.closePath();
-                            if (option) {
-                                return flubber.interpolateAll(shapefrom, shapeto, {single: true})
-                            } else {
-                                return flubber.interpolateAll(shapeto, shapefrom, {single: true})
-                            }
+                    let polyarr = d.geometry.coordinates;
+                    var filteredPolygons = d.geometry.coordinates.map(coordinates => path({
+                        type: 'Polygon',
+                        coordinates: coordinates
+                    }));
+                    let type = d.geometry.type;
+                    let shapefrom = [];
+                    let shapeto = [];
+                    if (type == "MultiPolygon") {
 
 
+                        for (let el in polyarr) {
+                            shapefrom.push(filteredPolygons[el]);
 
-
-                        } else {
                             let j1;
-                            if(y % 2 == 1){
-                                j1 = x*2+1;
+                            if (y % 2 == 1) {
+                                j1 = x * 2 + 1;
+                            } else {
+                                j1 = x * 2;
                             }
-                            else{
-                                j1 = x*2;
-                            }
-                            let mid = [j1*spacing/2+marginside, y*spacing+margintop];
+                            let mid = [j1 * spacing / 2 + marginside, y * spacing + margintop];
                             let top = {
                                 "x": mid[0],
-                                "y": mid[1]-size
+                                "y": mid[1] - size
                             }
                             let topleft = {
                                 "x": mid[0] + adj,
@@ -678,496 +657,564 @@
                             hex.lineTo(bottomright.x, bottomright.y);
                             hex.lineTo(topright.x, topleft.y);
                             hex.closePath();
-
+                            let sq = hex.toString();
 
                             shape = d3.path();
-                            shape.moveTo(-1000,0);
-                            shape.lineTo(-1000,0.001);
-                            shape.lineTo(-1000.001,0.001);
+                            shape.moveTo(-1000, 0);
+                            shape.lineTo(-1000, 0.001);
+                            shape.lineTo(-1000.001, 0.001);
                             shape.closePath();
+                            shape = shape.toString();
 
-                            let square;
-                            if(tracked){
-                                square = hex.toString();
-                            }
-                            else{
-                                square = shape.toString();
-                            }
-
-                            if (option) {
-                                return flubber.interpolate(path(d), square, {single: true})
+                            if (tracked) {
+                                shapeto.push(sq)
                             } else {
-                                return flubber.interpolate(square, path(d), {single: true})
+                                shapeto.push(shape)
                             }
 
+                        }
+
+                        shape = d3.path();
+                        shape.moveTo(0, 0);
+                        shape.closePath();
+                        if (option) {
+                            return flubber.interpolateAll(shapefrom, shapeto, {single: true})
+                        } else {
+                            return flubber.interpolateAll(shapeto, shapefrom, {single: true})
+                        }
+
+
+                    } else {
+                        let j1;
+                        if (y % 2 == 1) {
+                            j1 = x * 2 + 1;
+                        } else {
+                            j1 = x * 2;
+                        }
+                        let mid = [j1 * spacing / 2 + marginside, y * spacing + margintop];
+                        let top = {
+                            "x": mid[0],
+                            "y": mid[1] - size
+                        }
+                        let topleft = {
+                            "x": mid[0] + adj,
+                            "y": mid[1] - opp
+                        }
+                        let bottomleft = {
+                            "x": mid[0] + adj,
+                            "y": mid[1] + opp
+                        }
+                        let bottom = {
+                            "x": mid[0],
+                            "y": mid[1] + size
+                        }
+                        let bottomright = {
+                            "x": mid[0] - adj,
+                            "y": mid[1] + opp
+                        }
+                        let topright = {
+                            "x": mid[0] - adj,
+                            "y": mid[1] - opp
+                        }
+                        hex = d3.path();
+                        hex.moveTo(top.x, top.y);
+                        hex.lineTo(topleft.x, topleft.y);
+                        hex.lineTo(bottomleft.x, bottomleft.y);
+                        hex.lineTo(bottom.x, bottom.y);
+                        hex.lineTo(bottomright.x, bottomright.y);
+                        hex.lineTo(topright.x, topleft.y);
+                        hex.closePath();
+
+
+                        shape = d3.path();
+                        shape.moveTo(-1000, 0);
+                        shape.lineTo(-1000, 0.001);
+                        shape.lineTo(-1000.001, 0.001);
+                        shape.closePath();
+
+                        let square;
+                        if (tracked) {
+                            square = hex.toString();
+                        } else {
+                            square = shape.toString();
+                        }
+
+                        if (option) {
+                            return flubber.interpolate(path(d), square, {single: true})
+                        } else {
+                            return flubber.interpolate(square, path(d), {single: true})
+                        }
+
+                    }
+
+                });
+
+
+            d3.selectAll(".ActiveSituated").each(function () {
+                generateRadial(this, values);
+            });
+
+            d3.selectAll("path")
+                .classed("Active", false);
+
+            updateBars();
+
+        }
+
+        function onclick(d) {
+            var country = d.properties.ISO3_CODE;
+
+            var gridcountry = values[1].find(d => d.code === country);
+
+            // This zooms in on a hex that's clicked, as well as a country in transition
+            if (gridcountry != null) {
+                let x = gridcountry.x;
+                let y = gridcountry.y;
+                let j1;
+                if (y % 2 === 1)
+                    j1 = x * 2 + 1;
+                else
+                    j1 = x * 2;
+
+                let mid = [j1 * spacing / 2 + marginside, y * spacing + margintop];
+                clickedbox(mid[0] - opp, mid[1] - size, mid[0] + opp, mid[1] + size);
+
+                // Transition to hex grid if not already there
+                if (!block) {
+                    switchmode(true);
+                    block = true;
+                }
+            }
+
+
+        }
+
+        function farmode() {
+            reset();
+            if (block) {
+                switchmode(!block);
+                block = !block;
+            }
+        }
+
+        let plot = mapOverlay.selectAll("g")
+            .data(values[0].features)
+            .enter()
+            .append("g");
+
+        plot.on('click', function (d) {
+            // Generate detail plots if already in block
+            // Have to check boolean block is flipped, but after path changed
+            let flag = false;
+            if (block) {
+                // Toggle active tag
+                d3.select(this)
+                    .classed("Active", !d3.select(this).classed("Active"));
+                flag = true;
+            }
+
+
+            // Transition and move plot
+            let name = d.properties.NAME_ENGL;
+            let retname = values[2].find(d => d.country === name);
+            if (retname != null) {
+                onclick(d);
+            } else {
+                if (!block) {
+                    switchmode(true);
+                    block = !block;
+                }
+            }
+
+            if (flag) {
+                generateRadial(this, values);
+                updateBars();
+            }
+
+
+        });
+
+        plot.append("path")
+            .attr("class", "country")
+            .attr("id", d => "path-" + d.properties.ISO3_CODE)
+            .attr("d", path)
+            .attr("fill", function (d) {
+                let name = d.properties.NAME_ENGL;
+                let retname = values[2].find(d => d.country === name);
+                if (retname != null) {
+                    return colorscale(retname.happiness_score)
+                }
+                return "grey";
+            })
+            .attr("stroke", "black")
+            .style('opacity', function (d) {
+                let name = d.properties.NAME_ENGL;
+                let retname = values[2].find(d => d.country === name);
+                if (retname != null) {
+                    return 1
+                }
+                return 0.2;
+            })
+            .style('stroke-width', 0)
+
+            .on("mousemove", function (d) {
+                let country = d.properties.ISO3_CODE;
+                var name = d.properties.NAME_ENGL;
+                tooltip.style("opacity", 1)
+                    .html(function (d) {
+                        let retname = values[2].find(d => d.country === name);
+                        let happy = "Not tracked";
+                        if (retname != null) {
+                            happy = retname.happiness_score
+                        }
+                        return name + "<br>Happiness score: " + happy;
+                    })
+
+                    .style('left', (d3.event.pageX + 10) + 'px')
+                    .style('top', (d3.event.pageY) + 'px')
+                    .style('display', 'inline-block')
+            })
+            .on('mouseover', function (d) {
+                d3.select(this)
+                    .style('stroke-width', 4);
+
+                tooltip
+                    .style("opacity", 1);
+
+
+            })
+            .on('mouseout', function (d) {
+                d3.select(this)
+                    .style('stroke-width', function (d) {
+                        if (block) {
+                            return 2;
+                        }
+                        return 0;
+                    });
+                tooltip
+                    .style("opacity", 0)
+            })
+            .style("stroke", function (d) {
+                let country = d.properties.ISO3_CODE;
+                let retcode = values[3].find(d => d["alpha-3"] === country);
+                if (retcode != null) {
+                    if (retcode.region == "Asia") {
+                        return palette[0];
+                    }
+                    if (retcode.region == "Europe") {
+                        return palette[3];
+                    }
+                    if (retcode.region == "Africa") {
+                        return palette[4];
+                    }
+                    if (retcode.region == "Americas") {
+                        return palette[6];
+                    }
+                    if (retcode.region == "Oceania") {
+                        return palette[7];
+                    }
+
+                }
+                return "blue";
+            })
+
+
+        plot.append("text")
+            .attr("class", "countryname")
+            .attr("fill", "white")
+            .attr("x", function (d) {
+                let country = d.properties.ISO3_CODE;
+                let gridcountry = values[1].find(d => d.code === country);
+                if (gridcountry == null) {
+                    x = 0;
+                    y = 0;
+                } else {
+                    x = gridcountry.x;
+                    y = gridcountry.y;
+                }
+                let j1;
+                if (y % 2 == 1) {
+                    j1 = x * 2 + 1;
+                } else {
+                    j1 = x * 2;
+                }
+                let mid = [j1 * spacing / 2 + marginside, y * spacing + margintop];
+                return mid[0]
+            })
+            .attr("y", function (d) {
+                let country = d.properties.ISO3_CODE;
+                let gridcountry = values[1].find(d => d.code === country);
+                if (gridcountry == null) {
+                    x = 0;
+                    y = 0;
+                } else {
+                    x = gridcountry.x;
+                    y = gridcountry.y;
+                }
+                let j1;
+                if (y % 2 == 1) {
+                    j1 = x * 2 + 1;
+                } else {
+                    j1 = x * 2;
+                }
+                let mid = [j1 * spacing / 2 + marginside, y * spacing + margintop];
+                return mid[1] + 2
+            })
+            .style("text-anchor", "middle")
+            .style("font-size", "8")
+            .style("opacity", 0)
+            .text(function (d) {
+                return d.properties.ISO3_CODE;
+            })
+            .style("pointer-events", "none");
+        ;
+
+
+        let button = viewbox.append("g")
+            .on('click', function (d) {
+                reset()
+                switchmode(!block);
+                block = !block;
+
+            });
+
+        button.append("rect")
+            .attr("x", 5)
+            .attr("y", 5)
+            .attr("width", size * 4 + 20)
+            .attr("height", size * 4 + 20)
+            .attr("rx", 15)
+            .attr("ry", 15)
+            .style("fill", "white")
+            .style("opacity", 0.9);
+        button.append("path")
+            .attr("id", "button")
+            .attr("d", buttonpath)
+            .attr("fill", "black")
+            .style("opacity", 0.7);
+
+        ;
+        var regiondata = [
+            {
+                "region": "Asia",
+                "color": palette[0],
+                "on": true
+            },
+            {
+                "region": "Europe",
+                "color": palette[3],
+                "on": true
+            },
+            {
+                "region": "Africa",
+                "color": palette[4],
+                "on": true
+            },
+            {
+                "region": "Americas",
+                "color": palette[6],
+                "on": true
+            },
+            {
+                "region": "Oceania",
+                "color": palette[7],
+                "on": true
+            }
+        ]
+        let legendbox = viewbox.append("g").attr("class", "legend-group")
+            .attr("transform", "translate(0," + (h - 135) + ")");
+
+        var legendout = legendbox
+            .append("g")
+            .attr("class", "legend-other")
+            .attr("transform", "translate(0,-10)");
+
+        legendout.append("rect")
+            .attr("x", w - 175)
+            .attr("y", -10)
+            .attr("width", 200)
+            .attr("height", 150)
+            .style("fill", "white")
+            .style("opacity", 0.5)
+            .on("click", function (d) {
+                return true;
+            })
+
+
+        legendout
+            .append("text")
+            .attr("x", w - 5)
+            .attr("y", -10)
+            .attr("dy", "1.5em")
+            .style("text-anchor", "end")
+            .text("Regions");
+
+
+        let legend = legendbox.selectAll(".legend")
+            .data(regiondata)
+            .enter().append("g")
+            .attr("class", "legend")
+            .attr("transform", function (d, i) {
+                return "translate(0," + (i + 1) * 20 + ")";
+            });
+
+
+        // draw legend colored rectangles
+        legend.append("rect")
+            .attr("x", w - 18)
+            .attr("width", 18)
+            .attr("height", 18)
+            .style("fill", (d, i) => d.color)
+            .on("click", function (d) {
+                d.on = !d.on;
+                var countryval = d;
+
+                d3.select(this)
+                    .transition()
+                    .duration(750)
+                    .style("opacity", function (d) {
+
+                        if (countryval.on) {
+                            return 1;
+                        } else {
+                            return 0.2;
                         }
 
                     });
 
+                svg.selectAll(".country")
+                    .each(function (d) {
+                        let country = d.properties.ISO3_CODE;
+                        var name = d.properties.NAME_ENGL;
+                        let retcode = values[3].find(d => d["alpha-3"] === country);
+                        let retname = values[2].find(d => d.country === name);
+                        if (retcode != null && retname != null && retcode.region == countryval.region) {
+                            d3.select(this)
+                                .transition()
+                                .duration(750)
+                                .style("opacity", function (d) {
 
-                d3.selectAll(".ActiveSituated").each(function () {
-                    generateRadial(this, values);
-                });
+                                    if (countryval.on) {
+                                        return 1;
+                                    } else {
+                                        return 0.2;
+                                    }
 
-                d3.selectAll("path")
-                    .classed("Active", false);
+                                });
 
-                updateBars();
-
-            }
-
-            function onclick (d) {
-                var country = d.properties.ISO3_CODE;
-
-                var gridcountry  = values[1].find(d => d.code === country);
-
-                // This zooms in on a hex that's clicked, as well as a country in transition
-                if (gridcountry != null) {
-                    let x = gridcountry.x;
-                    let y = gridcountry.y;
-                    let j1;
-                    if(y % 2 === 1)
-                        j1 = x*2+1;
-                    else
-                        j1 = x*2;
-
-                    let mid = [j1*spacing/2 +marginside, y*spacing +margintop];
-                    clickedbox(mid[0]-opp, mid[1]-size, mid[0]+opp, mid[1]+size);
-
-                    // Transition to hex grid if not already there
-                    if(!block) {
-                        switchmode(true);
-                        block = true;
-                    }
-                }
-
-
-            }
-
-            function farmode(){
-                reset();
-                if(block){
-                    switchmode(!block);
-                    block = !block;
-                }
-            }
-
-            let plot = mapOverlay.selectAll("g")
-                .data(values[0].features)
-                .enter()
-                .append("g");
-
-            plot.on('click', function (d) {
-                    // Generate detail plots if already in block
-                    // Have to check boolean block is flipped, but after path changed
-                    let flag = false;
-                    if (block) {
-                        // Toggle active tag
-                        d3.select(this)
-                            .classed("Active", !d3.select(this).classed("Active"));
-                        flag = true;
-                    }
-
-
-                    // Transition and move plot
-                    let name = d.properties.NAME_ENGL;
-                    let retname = values[2].find(d => d.country === name);
-                    if(retname != null) {
-                        onclick(d);
-                    }
-                    else {
-                        if(!block) {
-                            switchmode(true);
-                            block = !block;
-                        }
-                    }
-
-                    if (flag) {
-                        generateRadial(this, values);
-                        updateBars();
-                    }
-
-
-
-
-                });
-
-            plot.append("path")
-                .attr("class", "country")
-                .attr("id", d => "path-" + d.properties.ISO3_CODE)
-                .attr("d", path)
-                .attr("fill",  function (d) {
-                    let name = d.properties.NAME_ENGL;
-                    let retname = values[2].find(d => d.country === name);
-                    if(retname != null){
-                        return colorscale(retname.happiness_score)
-                    }
-                    return "grey";
-                })
-                .attr("stroke", "black")
-                .style('opacity',  function (d) {
-                    let name = d.properties.NAME_ENGL;
-                    let retname = values[2].find(d => d.country === name);
-                    if(retname != null){
-                        return 1
-                    }
-                    return 0.2;
-                })
-                .style('stroke-width',0)
-
-                .on("mousemove", function (d){
-                    let country = d.properties.ISO3_CODE;
-                    var name = d.properties.NAME_ENGL;
-                    tooltip.style("opacity", 1)
-                        .html(function(d){
-                            let retname = values[2].find(d => d.country === name);
-                            let happy = "Not tracked";
-                            if(retname != null){
-                                happy = retname.happiness_score
-                            }
-                            return name + "<br>Happiness score: " + happy;
-                        })
-
-                        .style('left', (d3.event.pageX + 10) + 'px')
-                        .style('top', (d3.event.pageY ) + 'px')
-                        .style('display', 'inline-block')
-                })
-                .on('mouseover',function(d){
-                    d3.select(this)
-                        .style('stroke-width', 4);
-
-                    tooltip
-                        .style("opacity", 1);
-
-
-                })
-                .on('mouseout', function(d){
-                    d3.select(this)
-                        .style('stroke-width', function (d) {
-                            if(block){
-                                return 2;
-                            }
-                            return 0;
-                        });
-                    tooltip
-                        .style("opacity", 0)
-                })
-                .style("stroke", function(d){
-                    let country = d.properties.ISO3_CODE;
-                    let retcode = values[3].find(d => d["alpha-3"] === country);
-                    if(retcode != null){
-                        if(retcode.region == "Asia"){
-                            return palette[0];
-                        }
-                        if(retcode.region == "Europe"){
-                            return palette[3];
-                        }
-                        if(retcode.region == "Africa"){
-                            return palette[4];
-                        }
-                        if(retcode.region == "Americas"){
-                            return palette[6];
-                        }
-                        if(retcode.region == "Oceania"){
-                            return palette[7];
-                        }
-
-                    }
-                    return "blue";
-                })
-
-
-            plot.append("text")
-                .attr("class", "countryname")
-                .attr("fill", "white")
-                .attr("x", function(d){
-                    let country = d.properties.ISO3_CODE;
-                    let gridcountry = values[1].find(d => d.code === country);
-                    if(gridcountry == null){
-                        x = 0;
-                        y = 0;
-                    }
-                    else{
-                        x = gridcountry.x;
-                        y = gridcountry.y;
-                    }
-                    let j1;
-                    if(y % 2 == 1){
-                        j1 = x*2+1;
-                    }
-                    else{
-                        j1 = x*2;
-                    }
-                    let mid = [j1*spacing/2+marginside, y*spacing+margintop];
-                    return mid[0]
-                })
-                .attr("y", function (d) {
-                    let country = d.properties.ISO3_CODE;
-                    let gridcountry = values[1].find(d => d.code === country);
-                    if(gridcountry == null){
-                        x = 0;
-                        y = 0;
-                    }
-                    else{
-                        x = gridcountry.x;
-                        y = gridcountry.y;
-                    }
-                    let j1;
-                    if(y % 2 == 1){
-                        j1 = x*2+1;
-                    }
-                    else{
-                        j1 = x*2;
-                    }
-                    let mid = [j1*spacing/2+marginside, y*spacing+margintop];
-                    return mid[1]+2
-                })
-                .style("text-anchor", "middle")
-                .style("font-size", "8")
-                .style("opacity", 0)
-                .text(function (d) {
-                    return d.properties.ISO3_CODE;
-                })
-                .style("pointer-events", "none");;
-
-
-            let button =viewbox.append("g")
-                .on('click', function(d){
-                    reset()
-                    switchmode(!block);
-                    block = !block;
-
-                });
-
-                button.append("rect")
-                .attr("x", 5)
-                .attr("y", 5)
-                .attr("width", size*4+20)
-                .attr("height", size*4+20)
-                .attr("rx", 15)
-                .attr("ry", 15)
-                .style("fill", "white")
-                .style("opacity", 0.9);
-                button.append("path")
-                    .attr("id", "button")
-                    .attr("d", buttonpath)
-                    .attr("fill", "black")
-                    .style("opacity", 0.7);
-
-                ;
-            var regiondata = [
-                {
-                    "region": "Asia",
-                    "color": palette[0],
-                    "on": true
-                },
-                {
-                    "region": "Europe",
-                    "color": palette[3],
-                    "on": true
-                },
-                {
-                    "region": "Africa",
-                    "color": palette[4],
-                    "on": true
-                },
-                {
-                    "region": "Americas",
-                    "color": palette[6],
-                    "on": true
-                },
-                {
-                    "region": "Oceania",
-                    "color": palette[7],
-                    "on": true
-                }
-            ]
-            let legendbox = viewbox.append("g").attr("class", "legend-group")
-                .attr("transform", "translate(0,"+ (h-135) +")");
-
-            var legendout = legendbox
-                .append("g")
-                .attr("class", "legend-other")
-                .attr("transform", "translate(0,-10)");
-
-            legendout.append("rect")
-                .attr("x", w-175)
-                .attr("y", -10)
-                .attr("width", 200)
-                .attr("height", 150)
-                .style("fill", "white")
-                .style("opacity", 0.5)
-                .on("click", function (d){
-                    return true;
-                })
-
-
-            legendout
-                .append("text")
-                .attr("x", w-5)
-                .attr("y", -10)
-                .attr("dy", "1.5em")
-                .style("text-anchor", "end")
-                .text("Regions");
-
-
-            let legend = legendbox.selectAll(".legend")
-                .data(regiondata)
-                .enter().append("g")
-                .attr("class", "legend")
-                .attr("transform", function(d, i) { return "translate(0," + (i+1) * 20 + ")"; });
-
-
-            // draw legend colored rectangles
-            legend.append("rect")
-                .attr("x", w - 18)
-                .attr("width", 18)
-                .attr("height", 18)
-                .style("fill", (d,i)=> d.color)
-                .on("click", function (d){
-                    d.on = !d.on;
-                    var countryval = d;
-
-                    d3.select(this)
-                        .transition()
-                        .duration(750)
-                        .style("opacity", function(d) {
-
-                            if (countryval.on) {
-                                return 1;
-                            } else {
-                                return 0.2;
-                            }
-
-                        });
-
-                    svg.selectAll(".country")
-                        .each(function (d){
-                            let country = d.properties.ISO3_CODE;
-                            var name = d.properties.NAME_ENGL;
-                            let retcode = values[3].find(d => d["alpha-3"] === country);
-                            let retname = values[2].find(d => d.country === name);
-                            if(retcode != null && retname != null && retcode.region == countryval.region){
-                                d3.select(this)
-                                    .transition()
-                                    .duration(750)
-                                    .style("opacity", function(d) {
-
-                                        if (countryval.on) {
-                                            return 1;
-                                        } else {
-                                            return 0.2;
-                                        }
-
-                                    });
-
-                                d3.select(this)
+                            d3.select(this)
                                 .classed("hiddenbycountry", countryval.on)
-                            }
-                        });
-                });
+                        }
+                    });
+            });
 
-            // draw legend text
-            legend.append("text")
-                .attr("x", w - 25)
-                .attr("y", 9)
-                .attr("dy", ".35em")
-                .style("text-anchor", "end")
-                .text(function(d) { return d.region;});
-
-
-            //Append a defs (for definition) element to your SVG
-            var defs = legendbox.append("defs");
-
-            //Append a linearGradient element to the defs and give it a unique id
-            var linearGradient = defs.append("linearGradient")
-                .attr("id", "linear-gradient");
-
-            //Vertical gradient
-            linearGradient
-                .attr("x1", "0%")
-                .attr("y1", "0%")
-                .attr("x2", "0%")
-                .attr("y2", "100%");
-
-            //Append multiple color stops by using D3's data/enter step
-            linearGradient.selectAll("stop")
-                .data([
-                    {offset: "0%", color: colorscale(8)},
-                    {offset: "12.5%", color: colorscale(7)},
-                    {offset: "25%", color: colorscale(6)},
-                    {offset: "37.5%", color: colorscale(5)},
-                    {offset: "50%", color: colorscale(4)},
-                    {offset: "62.5%", color: colorscale(3)},
-                    {offset: "75%", color: colorscale(2)},
-                    {offset: "87.5%", color: colorscale(1)},
-                    {offset: "100%", color: colorscale(0)}
-                ])
-                .enter().append("stop")
-                .attr("offset", function(d) { return d.offset; })
-                .attr("stop-color", function(d) { return d.color; });
+        // draw legend text
+        legend.append("text")
+            .attr("x", w - 25)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .style("text-anchor", "end")
+            .text(function (d) {
+                return d.region;
+            });
 
 
-            var legendWidth = 18,
-                legendHeight = 100
-            xpos = w-120
-            ypos = 17;
+        //Append a defs (for definition) element to your SVG
+        var defs = legendbox.append("defs");
+
+        //Append a linearGradient element to the defs and give it a unique id
+        var linearGradient = defs.append("linearGradient")
+            .attr("id", "linear-gradient");
+
+        //Vertical gradient
+        linearGradient
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "0%")
+            .attr("y2", "100%");
+
+        //Append multiple color stops by using D3's data/enter step
+        linearGradient.selectAll("stop")
+            .data([
+                {offset: "0%", color: colorscale(8)},
+                {offset: "12.5%", color: colorscale(7)},
+                {offset: "25%", color: colorscale(6)},
+                {offset: "37.5%", color: colorscale(5)},
+                {offset: "50%", color: colorscale(4)},
+                {offset: "62.5%", color: colorscale(3)},
+                {offset: "75%", color: colorscale(2)},
+                {offset: "87.5%", color: colorscale(1)},
+                {offset: "100%", color: colorscale(0)}
+            ])
+            .enter().append("stop")
+            .attr("offset", function (d) {
+                return d.offset;
+            })
+            .attr("stop-color", function (d) {
+                return d.color;
+            });
+
+
+        var legendWidth = 18,
+            legendHeight = 100
+        xpos = w - 120
+        ypos = 17;
 
 //Color Legend container
-            var legendsvg = legendbox.append("g")
-                .attr("class", "legendWrapper")
+        var legendsvg = legendbox.append("g")
+            .attr("class", "legendWrapper")
 
 //Draw the Rectangle
-            legendsvg.append("rect")
-                .attr("class", "legendRect")
-                .attr("x", xpos)
-                .attr("y", ypos)
-                //.attr("rx", legendHeight/2)
-                .attr("width", legendWidth)
-                .attr("height", legendHeight)
-                .style("fill", "url(#linear-gradient)");
+        legendsvg.append("rect")
+            .attr("class", "legendRect")
+            .attr("x", xpos)
+            .attr("y", ypos)
+            //.attr("rx", legendHeight/2)
+            .attr("width", legendWidth)
+            .attr("height", legendHeight)
+            .style("fill", "url(#linear-gradient)");
 
 //Append title
-            legendsvg.append("text")
-                .attr("class", "legendTitle")
+        legendsvg.append("text")
+            .attr("class", "legendTitle")
 
-                .append('svg:tspan')
-                .attr('x', xpos-50)
-                .attr('dy', ypos-20)
-                .text("Happiness")
-                .append('svg:tspan')
-                .attr('x', xpos-20)
-                .attr('dy', ypos-5)
-                .text("Index");
+            .append('svg:tspan')
+            .attr('x', xpos - 50)
+            .attr('dy', ypos - 20)
+            .text("Happiness")
+            .append('svg:tspan')
+            .attr('x', xpos - 20)
+            .attr('dy', ypos - 5)
+            .text("Index");
 
 //Set scale for x-axis
-            var xScale = d3.scaleLinear()
-                .range([0, legendHeight])
-                .domain([8,0])
-                .nice();
+        var xScale = d3.scaleLinear()
+            .range([0, legendHeight])
+            .domain([8, 0])
+            .nice();
 
 //Define x-axis
-            var xAxis = d3.axisLeft()
-                .ticks(5)  //Set rough # of ticks
-                //.tickFormat(formatPercent)
-                .scale(xScale);
+        var xAxis = d3.axisLeft()
+            .ticks(5)  //Set rough # of ticks
+            //.tickFormat(formatPercent)
+            .scale(xScale);
 
 //Set up X axis
-            legendsvg.append("g")
-                .attr("class", "axis")  //Assign "axis" class
-                .attr("transform", "translate(" + xpos + "," + ypos + ")")
-                .call(xAxis);
+        legendsvg.append("g")
+            .attr("class", "axis")  //Assign "axis" class
+            .attr("transform", "translate(" + xpos + "," + ypos + ")")
+            .call(xAxis);
 
 
-            bg.on("click", function(d){
-                farmode();
-            })
+        bg.on("click", function (d) {
+            farmode();
+        })
 
     });
 
-        function translate(x, y) {
-            return `translate (${x}, ${y})`;
-        }
-    </script>
+    function translate(x, y) {
+        return `translate (${x}, ${y})`;
+    }
+</script>
 </body>
 </html>
