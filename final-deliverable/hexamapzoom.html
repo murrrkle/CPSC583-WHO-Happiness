@@ -994,7 +994,6 @@
             .attr("fill", "black")
             .style("opacity", 0.7);
 
-        ;
         var regiondata = [
             {
                 "region": "Asia",
@@ -1022,6 +1021,8 @@
                 "on": true
             }
         ]
+
+        //the following code is drawn from Assignment 3
         let legendbox = viewbox.append("g").attr("class", "legend-group")
             .attr("transform", "translate(0," + (h - 135) + ")");
 
@@ -1109,6 +1110,8 @@
                     });
             });
 
+
+        //code for the gradient legend is drawn from: http://bl.ocks.org/nbremer/a43dbd5690ccd5ac4c6cc392415140e7
         // draw legend text
         legend.append("text")
             .attr("x", w - 25)
