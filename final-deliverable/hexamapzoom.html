@@ -9,7 +9,7 @@
 </style>
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>2019 World Happiness Report Visualization</title>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script src="https://unpkg.com/flubber@0.3.0"></script>
     <script src="radialPlots.js"></script>
@@ -67,6 +67,8 @@
             d3.zoomTransform(viewbox.node()).invert([w / 2, h / 2])
         );
     }
+
+
 
     function clicked(d) {
         const [[x0, y0], [x1, y1]] = path.bounds(d);
@@ -581,6 +583,7 @@
                 });
 
 
+            
             svg.selectAll(".countryname")
                 .transition()
                 .duration(2000)
@@ -1235,6 +1238,34 @@
         })
 
     });
+
+    var titlebox = viewbox.append("g");
+
+    titlebox.append("rect")
+        .attr("x", w/2 - 225)
+        .attr("y", h - 50)
+        .style("fill", "white")
+        .style("opacity", 0.4)
+        .attr("height", 45)
+        .attr("width", 450)
+        .style("pointer-events", "none");
+
+
+    titlebox.append("text")
+        .text("2019 World Happiness Report")
+        .attr("x", w/2)
+        .attr("y", h - 20)
+        .style("fill", "Black")
+        .style("font-size", 32)
+        .style("text-anchor", "middle")
+        .on("mouseover", function(d){
+            d3.select(this)
+                .style("opacity", 0.2)
+        })
+        .on("mouseout", function(d){
+            d3.select(this)
+                .style("opacity", 1)
+        });
 
     function translate(x, y) {
         return `translate (${x}, ${y})`;
