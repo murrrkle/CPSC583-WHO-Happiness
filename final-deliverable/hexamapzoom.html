@@ -507,7 +507,17 @@
                 .attr("class", d => d.country)
                 .attr("x", (d, i) => (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2)) // longitude
                 .attr("y", (d, i) => {
-                    return d3.select(d3.selectAll("rect." + d.country.replace(/ /g, '.'))._groups[0][6]).attr("y") - 5
+                    let tmp = d3.selectAll("rect." + d.country.replace(/ /g, '.'))._groups[0];
+                    let tmp2 = Array.from(tmp)
+                    let tmp3 = tmp2.map(e => d3.select(e).attr("y"));
+
+                    let lowestY = tmp3.reduce(function(previousValue, currentValue) {
+                        //console.log(parseFloat(previousValue), parseFloat(currentValue), parseFloat(previousValue) < parseFloat(currentValue));
+                        return (parseFloat(previousValue) < parseFloat(currentValue) ? parseFloat(previousValue) : parseFloat(currentValue));
+                    });
+                    //console.log(lowestY);
+                    return lowestY - 5;
+                    //return d3.select(d3.selectAll("rect." + d.country.replace(/ /g, '.'))._groups[0][6]).attr("y") - 5
                 })
                 .style("stroke", "black");
 
@@ -515,7 +525,17 @@
                 .attr("class", d => d.country)
                 .attr("x", (d, i) => (isNaN(w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2) ? 0 : (w - barWindowWidth + barWindowXScale(barWindowXdomain[i]) + barWindowXScale.bandwidth() / 2))) // longitude
                 .attr("y", (d, i) => {
-                    return d3.select("rect.corruptionPerception." + d.country.replace(/ /g, '.')).attr("y")
+                    let tmp = d3.selectAll("rect." + d.country.replace(/ /g, '.'))._groups[0];
+                    let tmp2 = Array.from(tmp)
+                    let tmp3 = tmp2.map(e => d3.select(e).attr("y"));
+
+                    let lowestY = tmp3.reduce(function(previousValue, currentValue) {
+                        //console.log(parseFloat(previousValue), parseFloat(currentValue), parseFloat(previousValue) < parseFloat(currentValue));
+                        return (parseFloat(previousValue) < parseFloat(currentValue) ? parseFloat(previousValue) : parseFloat(currentValue));
+                    });
+                    //console.log(lowestY);
+                    return lowestY - 5;
+                    //return d3.select("rect.corruptionPerception." + d.country.replace(/ /g, '.')).attr("y")
                 })
                 .remove();
 
